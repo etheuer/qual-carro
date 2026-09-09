@@ -2,3 +2,16 @@
 node_modules/
 .impeccable/
 review/
+.expo/
+dist/
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+web-build/
+

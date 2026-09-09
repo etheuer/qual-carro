@@ -1,0 +1,649 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  useFonts,
+  Archivo_400Regular,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+  Archivo_800ExtraBold,
+} from "@expo-google-fonts/archivo";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LINES, STATION_NAMES } from "./src/data.js";
+import {
+  currentAdvice,
+  formatCars,
+  intentPhrase,
+  lineColor,
+  lineInk,
+  metroLines,
+  stationTitle,
+  transferOptions,
+  voteKey,
+} from "./src/lookup.js";
+import { Train } from "./src/components/Train.js";
+import { StationField } from "./src/components/StationField.js";
+import { colors } from "./src/theme.js";
+
+const FEEDBACK_KEY = "qual-carro-feedback";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+export default function App() {
+  const [fontsLoaded] = useFonts({
+    Archivo: Archivo_400Regular,
+    Archivo_400Regular,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+    Archivo_800ExtraBold,
+  });
+
+  const [destId, setDestId] = useState(null);
+  const [originId, setOriginId] = useState(null);
+  const [destQuery, setDestQuery] = useState("");
+  const [originQuery, setOriginQuery] = useState("");
+  const [destOpen, setDestOpen] = useState(false);
+  const [originOpen, setOriginOpen] = useState(false);
+  const [lineId, setLineId] = useState(null);
+  const [direction, setDirection] = useState(null);
+  const [intent, setIntent] = useState("escada");
+  const [transferTo, setTransferTo] = useState(null);
+  const [votes, setVotes] = useState({});
+
+  useEffect(() => {
+    AsyncStorage.getItem(FEEDBACK_KEY).then((raw) => {
+      if (raw) setVotes(JSON.parse(raw));
+    });
+  }, []);
+
+  const adv = useMemo(
+    () => currentAdvice({ destId, originId, lineId, direction, intent, transferTo }),
+    [destId, originId, lineId, direction, intent, transferTo]
+  );
+
+  const routed = Boolean(adv?.routed);
+  const activeLineId = adv?.lineId || lineId;
+  const line = activeLineId ? LINES[activeLineId] : null;
+  const stripe = line?.color ?? colors.idleLine;
+
+  useEffect(() => {
+    if (routed && adv?.lineId) {
+      setLineId(adv.lineId);
+      setDirection(adv.direction);
+    }
+  }, [routed, adv?.lineId, adv?.direction]);
+
+  useEffect(() => {
+    if (!destId || routed) return;
+    const lines = metroLines(destId);
+    if (!lines.length) return;
+    if (!lineId || !lines.includes(lineId)) {
+      setLineId(lines[0]);
+      setDirection(null);
+      setIntent("escada");
+      setTransferTo(null);
+    }
+  }, [destId, lineId, routed]);
+
+  const lines = destId && !routed ? metroLines(destId) : [];
+  const transfers = destId && lineId && !routed ? transferOptions(destId, lineId) : [];
+
+  useEffect(() => {
+    if (intent === "transfer" && transfers.length && !transfers.includes(transferTo)) {
+      setTransferTo(transfers[0]);
+    }
+  }, [intent, transfers, transferTo]);
+
+  function pickDest(id) {
+    setDestId(id);
+    setDestQuery(STATION_NAMES[id]);
+    setDestOpen(false);
+    setLineId(null);
+    setDirection(null);
+    setIntent("escada");
+    setTransferTo(null);
+    Keyboard.dismiss();
+  }
+
+  function pickOrigin(id) {
+    setOriginId(id);
+    setOriginQuery(STATION_NAMES[id]);
+    setOriginOpen(false);
+    Keyboard.dismiss();
+  }
+
+  async function saveVote(vote) {
+    if (!adv || adv.error || adv.need) return;
+    const next = {
+      ...votes,
+      [voteKey(adv)]: {
+        vote,
+        cars: adv.cars,
+        at: Date.now(),
+        station: stationTitle(adv.stationId),
+        line: adv.lineId,
+      },
+    };
+    setVotes(next);
+    await AsyncStorage.setItem(FEEDBACK_KEY, JSON.stringify(next));
+  }
+
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return <View style={styles.root} />;
+  }
+
+  const vote = adv && !adv.error && !adv.need ? votes[voteKey(adv)]?.vote : null;
+
+  return (
+    <View style={styles.root}>
+      <StatusBar style="light" />
+      <LinearGradient
+        colors={[hexAlpha(stripe, 0.35), colors.asphalt]}
+        style={styles.wash}
+      />
+      <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+        <View style={[styles.stripe, { backgroundColor: stripe }]} />
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={Keyboard.dismiss}
+        >
+          <Text style={styles.title}>Qual carro?</Text>
+          <Text style={styles.lede}>
+            Metrô de São Paulo. Entra no carro certo pra não atravessar a plataforma inteira.
+          </Text>
+
+          <StationField
+            label="Onde você desce"
+            placeholder="Sé, Luz, Paraíso…"
+            query={destQuery}
+            onChangeQuery={(t) => {
+              setDestQuery(t);
+              setDestId(null);
+              setDestOpen(true);
+            }}
+            onFocus={() => {
+              setDestOpen(true);
+              setOriginOpen(false);
+            }}
+            onPick={pickDest}
+            open={destOpen}
+            excludeId={originId}
+          />
+
+          <StationField
+            label="De onde você sobe, se já souber"
+            placeholder="opcional — monta a rota"
+            query={originQuery}
+            onChangeQuery={(t) => {
+              setOriginQuery(t);
+              if (!t.trim()) {
+                setOriginId(null);
+                setOriginOpen(true);
+                return;
+              }
+              setOriginId(null);
+              setOriginOpen(true);
+            }}
+            onFocus={() => {
+              setOriginOpen(true);
+              setDestOpen(false);
+            }}
+            onPick={pickOrigin}
+            open={originOpen}
+            excludeId={destId}
+            showClear={Boolean(originId || originQuery)}
+            onClear={() => {
+              setOriginId(null);
+              setOriginQuery("");
+            }}
+          />
+
+          {routed ? (
+            <View style={styles.block}>
+              <Text style={styles.kicker}>Rota</Text>
+              {adv.path.legs.map((leg, idx) => {
+                const ln = LINES[leg.lineId];
+                const extra = leg.transferTo
+                  ? ` → ${LINES[leg.transferTo].name} em ${stationTitle(leg.transferAt)}`
+                  : "";
+                return (
+                  <View key={`${leg.lineId}-${idx}`} style={styles.leg}>
+                    <View style={[styles.mini, { backgroundColor: ln.color }]}>
+                      <Text style={[styles.miniText, { color: ln.ink }]}>{ln.short}</Text>
+                    </View>
+                    <Text style={styles.legText}>
+                      {stationTitle(leg.fromId)} até {stationTitle(leg.toId)}
+                      <Text style={styles.muted}> sentido {leg.direction}</Text>
+                      {extra}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : destId && lines.length ? (
+            <View style={styles.block}>
+              {lines.length > 1 ? (
+                <View style={styles.wrapRow}>
+                  {lines.map((id) => {
+                    const on = lineId === id;
+                    return (
+                      <Pressable
+                        key={id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        onPress={() => {
+                          setLineId(id);
+                          setDirection(null);
+                          setIntent("escada");
+                        }}
+                        style={[
+                          styles.chipBtn,
+                          on && { backgroundColor: lineColor(id), borderColor: lineColor(id) },
+                        ]}
+                      >
+                        <Text style={[styles.chipBtnText, on && { color: lineInk(id) }]}>
+                          {LINES[id].short} {LINES[id].name.replace(/^\d+-/, "")}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : line ? (
+                <View style={styles.leg}>
+                  <View style={[styles.mini, { backgroundColor: line.color }]}>
+                    <Text style={[styles.miniText, { color: line.ink }]}>{line.short}</Text>
+                  </View>
+                  <Text style={styles.legText}>{line.name}</Text>
+                </View>
+              ) : null}
+              {line ? (
+                <View style={styles.dirRow}>
+                  {line.terminals.map((t) => {
+                    const on = direction === t;
+                    return (
+                      <Pressable
+                        key={t}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        onPress={() => setDirection(t)}
+                        style={[styles.dir, on && styles.onLight]}
+                      >
+                        <Text style={[styles.dirLabel, on && styles.onLightText]}>sentido</Text>
+                        <Text style={[styles.dirName, on && styles.onLightText]}>{t}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {destId && lineId && !routed ? (
+            <View style={styles.block}>
+              <View style={styles.intentRow}>
+                {[
+                  ["escada", "Escada"],
+                  ["saida", "Saída da rua"],
+                  ...(transfers.length ? [["transfer", "Integração"]] : []),
+                ].map(([id, label]) => {
+                  const on = intent === id;
+                  return (
+                    <Pressable
+                      key={id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      onPress={() => setIntent(id)}
+                      style={[styles.intent, on && styles.onLight]}
+                    >
+                      <Text style={[styles.intentText, on && styles.onLightText]}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {intent === "transfer" && transfers.length ? (
+                <View style={styles.wrapRow}>
+                  {transfers.map((id) => {
+                    const on = transferTo === id;
+                    return (
+                      <Pressable
+                        key={id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        onPress={() => {
+                          setTransferTo(id);
+                          setIntent("transfer");
+                        }}
+                        style={[
+                          styles.chipBtn,
+                          on && { backgroundColor: lineColor(id), borderColor: lineColor(id) },
+                        ]}
+                      >
+                        <Text style={[styles.chipBtnText, on && { color: lineInk(id) }]}>
+                          {LINES[id].name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={styles.result}>
+            {!destId ? (
+              <>
+                <Train carCount={6} active={[]} any={false} direction={null} />
+                <Text style={styles.muted}>
+                  Escolhe onde você desce. O desenho do trem diz em qual carro entrar.
+                </Text>
+              </>
+            ) : adv?.error ? (
+              <Text style={styles.err}>{adv.error}</Text>
+            ) : adv?.need === "dir" ? (
+              <>
+                <Train
+                  carCount={LINES[lineId]?.cars ?? 6}
+                  active={[]}
+                  lineId={lineId}
+                  direction={null}
+                />
+                <Text style={styles.muted}>Agora o sentido. Carro 1 é sempre a frente do trem.</Text>
+              </>
+            ) : (
+              <>
+                <Train
+                  carCount={adv.carCount}
+                  active={adv.cars}
+                  any={adv.any}
+                  lineId={adv.lineId}
+                  direction={adv.direction}
+                />
+                <Text style={styles.headline} accessibilityLiveRegion="polite">
+                  {formatCars(adv.cars, adv.any)}
+                </Text>
+                <Text style={styles.sub}>
+                  {intentPhrase(adv)}
+                  {adv.routed
+                    ? ` · entra em ${stationTitle(adv.boardFromId)}`
+                    : ` · desce em ${stationTitle(adv.stationId)}`}
+                </Text>
+                <Text style={styles.why}>{adv.why}</Text>
+                <Text style={styles.conf}>
+                  Estimado — ainda não conferimos essa plataforma no campo.
+                </Text>
+                <View style={styles.feedback}>
+                  <Text style={styles.muted}>Isso bateu com a plataforma?</Text>
+                  <View style={styles.voteRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: vote === "yes" }}
+                      onPress={() => saveVote("yes")}
+                      style={[styles.vote, vote === "yes" && styles.voteYes]}
+                    >
+                      <Text style={[styles.voteText, vote === "yes" && styles.voteOnText]}>Bateu</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: vote === "no" }}
+                      onPress={() => saveVote("no")}
+                      style={[styles.vote, vote === "no" && styles.voteNo]}
+                    >
+                      <Text style={[styles.voteText, vote === "no" && styles.voteOnText]}>Não bateu</Text>
+                    </Pressable>
+                  </View>
+                  {vote ? (
+                    <Text style={styles.conf}>Ficou salvo neste celular. Ajuda na próxima visita de campo.</Text>
+                  ) : null}
+                </View>
+              </>
+            )}
+          </View>
+
+          <Text style={styles.foot}>
+            Posições de carro são estimadas a partir do tipo de plataforma (Wikipedia / Metrô SP). Ainda
+            não houve visita de campo. Carro 1 é a frente do trem, no sentido que você escolheu.
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+function hexAlpha(hex, a) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.asphalt,
+  },
+  wash: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 180,
+  },
+  safe: {
+    flex: 1,
+  },
+  stripe: {
+    height: 8,
+  },
+  scroll: {
+    paddingHorizontal: 18,
+    paddingBottom: 48,
+  },
+  title: {
+    marginTop: 22,
+    color: colors.enamel,
+    fontSize: 38,
+    lineHeight: 40,
+    fontFamily: "Archivo_800ExtraBold",
+    letterSpacing: -0.6,
+  },
+  lede: {
+    marginTop: 10,
+    color: colors.dust,
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: "Archivo_400Regular",
+    maxWidth: 280,
+  },
+  block: {
+    marginTop: 20,
+    gap: 10,
+  },
+  kicker: {
+    color: colors.dust,
+    fontFamily: "Archivo_400Regular",
+    marginBottom: 4,
+  },
+  wrapRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chipBtn: {
+    borderWidth: 1,
+    borderColor: "rgba(243,234,220,0.22)",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  chipBtnText: {
+    color: colors.enamel,
+    fontFamily: "Archivo_600SemiBold",
+    fontSize: 15,
+  },
+  mini: {
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  miniText: {
+    fontSize: 11,
+    fontFamily: "Archivo_700Bold",
+  },
+  leg: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  legText: {
+    color: colors.enamel,
+    fontFamily: "Archivo_400Regular",
+    flex: 1,
+    fontSize: 15,
+  },
+  muted: {
+    color: colors.dust,
+    fontFamily: "Archivo_400Regular",
+    fontSize: 15,
+  },
+  dirRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  dir: {
+    flex: 1,
+    minHeight: 64,
+    borderWidth: 1,
+    borderColor: "rgba(243,234,220,0.22)",
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  dirLabel: {
+    color: colors.dust,
+    fontFamily: "Archivo_400Regular",
+    fontSize: 14,
+  },
+  dirName: {
+    color: colors.enamel,
+    fontFamily: "Archivo_700Bold",
+    fontSize: 16,
+  },
+  onLight: {
+    backgroundColor: colors.enamel,
+    borderColor: colors.enamel,
+  },
+  onLightText: {
+    color: colors.ink,
+  },
+  intentRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  intent: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "rgba(243,234,220,0.22)",
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: "center",
+  },
+  intentText: {
+    color: colors.enamel,
+    fontFamily: "Archivo_600SemiBold",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  result: {
+    marginTop: 28,
+  },
+  headline: {
+    color: colors.enamel,
+    fontSize: 34,
+    lineHeight: 38,
+    fontFamily: "Archivo_800ExtraBold",
+    letterSpacing: -0.5,
+  },
+  sub: {
+    marginTop: 8,
+    color: colors.enamel,
+    fontSize: 17,
+    fontFamily: "Archivo_400Regular",
+  },
+  why: {
+    marginTop: 8,
+    color: colors.dust,
+    fontSize: 15,
+    fontFamily: "Archivo_400Regular",
+  },
+  conf: {
+    marginTop: 14,
+    color: colors.dust,
+    fontSize: 15,
+    fontFamily: "Archivo_400Regular",
+  },
+  err: {
+    color: colors.danger,
+    fontFamily: "Archivo_400Regular",
+    fontSize: 16,
+  },
+  feedback: {
+    marginTop: 22,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(243,234,220,0.14)",
+  },
+  voteRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  vote: {
+    borderWidth: 1,
+    borderColor: "rgba(243,234,220,0.22)",
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  voteText: {
+    color: colors.enamel,
+    fontFamily: "Archivo_600SemiBold",
+  },
+  voteYes: {
+    backgroundColor: colors.ok,
+    borderColor: colors.ok,
+  },
+  voteNo: {
+    backgroundColor: colors.danger,
+    borderColor: colors.danger,
+  },
+  voteOnText: {
+    color: colors.enamel,
+  },
+  foot: {
+    marginTop: 40,
+    color: "rgba(203,187,168,0.8)",
+    fontSize: 13,
+    fontFamily: "Archivo_400Regular",
+  },
+});

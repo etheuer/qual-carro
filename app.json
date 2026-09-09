@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Qual carro?",
+    "slug": "qual-carro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#241f1b"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.qualcarro",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#241f1b"
+      },
+      "package": "app.qualcarro"
+    }
+  }
+}

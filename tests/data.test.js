@@ -9,8 +9,9 @@ import {
   linesAt,
   resolveCars,
   searchStations,
-} from "../js/data.js";
-import { findPath, firstAlighting } from "../js/router.js";
+} from "../src/data.js";
+import { findPath, firstAlighting } from "../src/router.js";
+import { currentAdvice, formatCars } from "../src/lookup.js";
 
 describe("station graph", () => {
   it("names every id in LINE_ORDER", () => {
@@ -111,5 +112,21 @@ describe("router", () => {
 
   it("rejects the same station", () => {
     assert.equal(findPath("se", "se").error, "same");
+  });
+});
+
+describe("lookup", () => {
+  it("formats end cars", () => {
+    assert.equal(formatCars([1, 2, 5, 6], false), "carros 1 e 2, ou 5 e 6");
+  });
+
+  it("routes Jabaquara to Itaquera through Sé cars 3-4", () => {
+    const adv = currentAdvice({
+      destId: "corinthians-itaquera",
+      originId: "jabaquara",
+    });
+    assert.equal(adv.routed, true);
+    assert.deepEqual(adv.cars, [3, 4]);
+    assert.equal(adv.transferTo, "3");
   });
 });
