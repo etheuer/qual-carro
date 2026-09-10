@@ -12,6 +12,8 @@ android/
 *.key
 *.mobileprovision
 signing/
+screenshots/raw/
+.asc/artifacts/
 .metro-health-check*
 npm-debug.*
 web-build/
