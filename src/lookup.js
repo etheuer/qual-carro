@@ -1,13 +1,6 @@
-import {
-  ADVICE,
-  COMMUTER_AT,
-  LINES,
-  LINE_ORDER,
-  STATION_NAMES,
-  getAdvice,
-  linesAt,
-} from "./data.js";
+import { COMMUTER_AT, LINES, LINE_ORDER, STATION_NAMES, linesAt } from "./data.js";
 import { findPath, firstAlighting } from "./router.js";
+import { cellKey, getAdvice } from "./cells.js";
 
 export function lineColor(id) {
   return LINES[id]?.color ?? "#888";
@@ -23,6 +16,7 @@ export function stationTitle(id) {
 
 export function formatCars(cars, any) {
   if (any) return "qualquer carro";
+  if (!cars?.length) return "ainda não sabemos";
   const sorted = [...new Set(cars)].sort((a, b) => a - b);
   if (sorted.length === 1) return `carro ${sorted[0]}`;
   const runs = [];
@@ -51,12 +45,7 @@ export function metroLines(stationId) {
 }
 
 export function transferOptions(stationId, lineId) {
-  const fromAdvice = ADVICE[stationId]?.[lineId]?.transfer
-    ? Object.keys(ADVICE[stationId][lineId].transfer)
-    : [];
-  const present = linesAt(stationId).filter((id) => id !== lineId);
-  const ids = [...new Set([...fromAdvice, ...present])];
-  return ids.filter((id) => LINES[id]);
+  return linesAt(stationId).filter((id) => id !== lineId && LINES[id]);
 }
 
 export function intentPhrase(adv) {
@@ -67,11 +56,25 @@ export function intentPhrase(adv) {
   return "pra chegar na escada rolante";
 }
 
-export function voteKey(adv) {
-  return [adv.stationId, adv.lineId, adv.direction, adv.intent, adv.transferTo || ""].join("|");
+export function adviceKey(adv) {
+  return cellKey({
+    stationId: adv.stationId,
+    lineId: adv.lineId,
+    direction: adv.direction,
+    intent: adv.intent,
+    transferTo: adv.transferTo,
+  });
 }
 
-export function currentAdvice({ destId, originId, lineId, direction, intent, transferTo }) {
+export function currentAdvice({
+  destId,
+  originId,
+  lineId,
+  direction,
+  intent,
+  transferTo,
+  published,
+}) {
   if (!destId) return null;
   const path = originId ? findPath(originId, destId) : null;
   if (path?.error === "same") return { error: "Mesma estação nos dois campos." };
@@ -79,7 +82,14 @@ export function currentAdvice({ destId, originId, lineId, direction, intent, tra
   if (path?.legs) {
     const alight = firstAlighting(path);
     if (!alight) return { error: "Não achei rota no metrô entre essas duas." };
-    const adv = getAdvice(alight.stationId, alight.lineId, alight.intent, alight.transferTo);
+    const adv = getAdvice({
+      stationId: alight.stationId,
+      lineId: alight.lineId,
+      intent: alight.intent,
+      transferTo: alight.transferTo,
+      direction: alight.direction,
+      published,
+    });
     return {
       ...adv,
       lineId: alight.lineId,
@@ -93,7 +103,14 @@ export function currentAdvice({ destId, originId, lineId, direction, intent, tra
     };
   }
   if (!lineId || !direction) return { need: "dir" };
-  const adv = getAdvice(destId, lineId, intent, intent === "transfer" ? transferTo : null);
+  const adv = getAdvice({
+    stationId: destId,
+    lineId,
+    intent,
+    transferTo: intent === "transfer" ? transferTo : null,
+    direction,
+    published,
+  });
   return {
     ...adv,
     lineId,
@@ -105,4 +122,4 @@ export function currentAdvice({ destId, originId, lineId, direction, intent, tra
   };
 }
 
-export { COMMUTER_AT, LINES, LINE_ORDER };
+export { COMMUTER_AT, LINES, LINE_ORDER, cellKey, getAdvice };

@@ -2,9 +2,18 @@ import { Fragment } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Polygon, Rect, Text as SvgText } from "react-native-svg";
 import { LINES } from "../data.js";
+import { carToZone } from "../cells.js";
 import { colors } from "../theme.js";
 
-export function Train({ carCount = 6, active = [], any = false, lineId, direction, compact = false }) {
+export function Train({
+  carCount = 6,
+  active = [],
+  any = false,
+  lineId,
+  direction,
+  compact = false,
+  onZonePress,
+}) {
   const cars = Array.from({ length: carCount }, (_, i) => i + 1);
   const cabW = 16;
   const gap = 4;
@@ -34,6 +43,7 @@ export function Train({ carCount = 6, active = [], any = false, lineId, directio
                 width={carW}
                 height={h - 16}
                 fill={on ? onFill : colors.carOff}
+                onPress={onZonePress ? () => onZonePress(carToZone(n, carCount)) : undefined}
               />
               <SvgText
                 x={x + carW / 2}
@@ -43,6 +53,7 @@ export function Train({ carCount = 6, active = [], any = false, lineId, directio
                 fontSize="22"
                 fontWeight="700"
                 fontFamily="Archivo"
+                onPress={onZonePress ? () => onZonePress(carToZone(n, carCount)) : undefined}
               >
                 {String(n)}
               </SvgText>

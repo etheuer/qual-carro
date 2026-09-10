@@ -1,17 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  ADVICE,
-  LINE_ORDER,
-  LINES,
-  STATION_NAMES,
-  getAdvice,
-  linesAt,
-  resolveCars,
-  searchStations,
-} from "../src/data.js";
+import { LINE_ORDER, LINES, STATION_NAMES, linesAt, searchStations } from "../src/data.js";
 import { findPath, firstAlighting } from "../src/router.js";
 import { currentAdvice, formatCars } from "../src/lookup.js";
+import { SEED_CELLS, getAdvice, zoneToCars } from "../src/cells.js";
+import { addMark, publishedFromMarks, tally, PUBLISH_MIN } from "../src/marks.js";
 
 describe("station graph", () => {
   it("names every id in LINE_ORDER", () => {
@@ -34,40 +27,84 @@ describe("station graph", () => {
   });
 });
 
-describe("advice", () => {
+describe("cells", () => {
   it("puts Sé transfer in the middle cars", () => {
-    const a = getAdvice("se", "1", "transfer", "3");
+    const a = getAdvice({ stationId: "se", lineId: "1", intent: "transfer", transferTo: "3" });
+    assert.equal(a.unknown, false);
+    assert.equal(a.zone, "meio");
     assert.deepEqual(a.cars, [3, 4]);
+    assert.equal(a.origin, "seed");
   });
 
-  it("uses both ends as the default", () => {
-    const a = getAdvice("santana", "1", "escada");
-    assert.deepEqual(a.cars, [1, 2, 5, 6]);
-    assert.equal(a.confidence, "inferred");
+  it("does not invent ends for an unsurveyed station", () => {
+    const a = getAdvice({ stationId: "santana", lineId: "1", intent: "escada", direction: "Tucuruvi" });
+    assert.equal(a.unknown, true);
+    assert.deepEqual(a.cars, []);
+    assert.equal(a.confidence, "unknown");
+  });
+
+  it("does not invent ends for Sé escada", () => {
+    const a = getAdvice({ stationId: "se", lineId: "1", intent: "escada", direction: "Tucuruvi" });
+    assert.equal(a.unknown, true);
   });
 
   it("marks Paraíso transfer as any car", () => {
-    const a = getAdvice("paraiso", "1", "transfer", "2");
+    const a = getAdvice({ stationId: "paraiso", lineId: "1", intent: "transfer", transferTo: "2" });
     assert.equal(a.any, true);
     assert.equal(a.cars.length, 6);
+    assert.equal(a.zone, "qualquer");
   });
 
-  it("resolves tokens inside car count", () => {
-    assert.deepEqual(resolveCars("ends", 7), [1, 2, 6, 7]);
-    assert.deepEqual(resolveCars("middle", 6), [3, 4]);
+  it("maps thirds onto 6- and 7-car trains", () => {
+    assert.deepEqual(zoneToCars("frente", 6).cars, [1, 2]);
+    assert.deepEqual(zoneToCars("meio", 6).cars, [3, 4]);
+    assert.deepEqual(zoneToCars("fundo", 6).cars, [5, 6]);
+    assert.deepEqual(zoneToCars("meio", 7).cars, [3, 4, 5]);
+    assert.deepEqual(zoneToCars("fundo", 7).cars, [6, 7]);
   });
 
-  it("only references known stations and lines", () => {
-    for (const [stationId, body] of Object.entries(ADVICE)) {
-      assert.ok(STATION_NAMES[stationId], stationId);
-      for (const [lineId, spec] of Object.entries(body)) {
-        if (lineId === "note" || lineId === "source") continue;
-        assert.ok(LINES[lineId], `${stationId} ${lineId}`);
-        for (const to of Object.keys(spec.transfer || {})) {
-          assert.ok(LINES[to], `${stationId} xfer ${to}`);
-        }
-      }
+  it("only seeds known stations and lines", () => {
+    for (const cell of SEED_CELLS) {
+      assert.ok(STATION_NAMES[cell.stationId], cell.stationId);
+      assert.ok(LINES[cell.lineId], `${cell.stationId} ${cell.lineId}`);
+      if (cell.transferTo) assert.ok(LINES[cell.transferTo], `${cell.stationId} xfer ${cell.transferTo}`);
     }
+  });
+});
+
+describe("marks", () => {
+  it("does not publish before five agreeing marks", () => {
+    let store = {};
+    const key = "se|1|Tucuruvi|escada";
+    for (let i = 0; i < 4; i++) store = addMark(store, key, "frente");
+    const t = tally(store[key]);
+    assert.equal(t.published, false);
+    assert.equal(Object.keys(publishedFromMarks(store)).length, 0);
+  });
+
+  it("publishes when five of five agree", () => {
+    let store = {};
+    const key = "se|1|Tucuruvi|escada";
+    for (let i = 0; i < PUBLISH_MIN; i++) store = addMark(store, key, "frente");
+    const pub = publishedFromMarks(store);
+    assert.equal(pub[key].zone, "frente");
+  });
+
+  it("lets published user marks override a seed", () => {
+    let store = {};
+    const key = "se|1|Tucuruvi|transfer:3";
+    for (let i = 0; i < PUBLISH_MIN; i++) store = addMark(store, key, "frente");
+    const a = getAdvice({
+      stationId: "se",
+      lineId: "1",
+      intent: "transfer",
+      transferTo: "3",
+      direction: "Tucuruvi",
+      published: publishedFromMarks(store),
+    });
+    assert.equal(a.zone, "frente");
+    assert.equal(a.origin, "users");
+    assert.deepEqual(a.cars, [1, 2]);
   });
 });
 
@@ -111,7 +148,13 @@ describe("router", () => {
     const alight = firstAlighting(path);
     assert.equal(alight.intent, "transfer");
     assert.equal(alight.transferTo, "3");
-    const cars = getAdvice(alight.stationId, alight.lineId, alight.intent, alight.transferTo);
+    const cars = getAdvice({
+      stationId: alight.stationId,
+      lineId: alight.lineId,
+      intent: alight.intent,
+      transferTo: alight.transferTo,
+      direction: alight.direction,
+    });
     assert.deepEqual(cars.cars, [3, 4]);
   });
 
@@ -131,6 +174,10 @@ describe("lookup", () => {
     assert.equal(formatCars([1, 2, 5, 6], false), "carros 1 e 2, ou 5 e 6");
   });
 
+  it("formats unknown as silence", () => {
+    assert.equal(formatCars([], false), "ainda não sabemos");
+  });
+
   it("routes Jabaquara to Itaquera through Sé cars 3-4", () => {
     const adv = currentAdvice({
       destId: "corinthians-itaquera",
@@ -139,5 +186,15 @@ describe("lookup", () => {
     assert.equal(adv.routed, true);
     assert.deepEqual(adv.cars, [3, 4]);
     assert.equal(adv.transferTo, "3");
+    assert.equal(adv.unknown, false);
+  });
+
+  it("leaves a one-line ride unknown until marked", () => {
+    const adv = currentAdvice({
+      destId: "sao-bento",
+      originId: "jabaquara",
+    });
+    assert.equal(adv.routed, true);
+    assert.equal(adv.unknown, true);
   });
 });

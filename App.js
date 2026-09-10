@@ -5,6 +5,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -23,6 +24,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LINES, STATION_NAMES } from "./src/data.js";
 import {
+  adviceKey,
   currentAdvice,
   formatCars,
   intentPhrase,
@@ -31,13 +33,19 @@ import {
   metroLines,
   stationTitle,
   transferOptions,
-  voteKey,
 } from "./src/lookup.js";
+import { zoneToCars } from "./src/cells.js";
+import {
+  MARKS_KEY,
+  addMark,
+  lastZone,
+  publishedFromMarks,
+  splitPhrase,
+  tally,
+} from "./src/marks.js";
 import { Train } from "./src/components/Train.js";
 import { StationField } from "./src/components/StationField.js";
 import { colors } from "./src/theme.js";
-
-const FEEDBACK_KEY = "qual-carro-feedback";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -61,11 +69,11 @@ export default function App() {
   const [direction, setDirection] = useState(null);
   const [intent, setIntent] = useState("escada");
   const [transferTo, setTransferTo] = useState(null);
-  const [votes, setVotes] = useState({});
+  const [marks, setMarks] = useState({});
 
   useEffect(() => {
-    AsyncStorage.getItem(FEEDBACK_KEY).then((raw) => {
-      if (raw) setVotes(JSON.parse(raw));
+    AsyncStorage.getItem(MARKS_KEY).then((raw) => {
+      if (raw) setMarks(JSON.parse(raw));
     });
   }, []);
 
@@ -77,9 +85,11 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
+  const published = useMemo(() => publishedFromMarks(marks), [marks]);
   const adv = useMemo(
-    () => currentAdvice({ destId, originId, lineId, direction, intent, transferTo }),
-    [destId, originId, lineId, direction, intent, transferTo]
+    () =>
+      currentAdvice({ destId, originId, lineId, direction, intent, transferTo, published }),
+    [destId, originId, lineId, direction, intent, transferTo, published]
   );
 
   const routed = Boolean(adv?.routed);
@@ -134,20 +144,20 @@ export default function App() {
     Keyboard.dismiss();
   }
 
-  async function saveVote(vote) {
+  async function saveMark(zone) {
     if (!adv || adv.error || adv.need) return;
-    const next = {
-      ...votes,
-      [voteKey(adv)]: {
-        vote,
-        cars: adv.cars,
-        at: Date.now(),
-        station: stationTitle(adv.stationId),
-        line: adv.lineId,
-      },
-    };
-    setVotes(next);
-    await AsyncStorage.setItem(FEEDBACK_KEY, JSON.stringify(next));
+    const next = addMark(marks, adviceKey(adv), zone);
+    setMarks(next);
+    await AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
+  }
+
+  async function exportMarks() {
+    const keys = Object.keys(marks);
+    if (!keys.length) return;
+    await Share.share({
+      title: "qual-carro-marks",
+      message: JSON.stringify({ v: 1, at: Date.now(), marks }, null, 2),
+    });
   }
 
   useEffect(() => {
@@ -158,7 +168,9 @@ export default function App() {
     return <View style={styles.root} />;
   }
 
-  const vote = adv && !adv.error && !adv.need ? votes[voteKey(adv)]?.vote : null;
+  const markList = adv && !adv.error && !adv.need ? marks[adviceKey(adv)] : null;
+  const markStats = tally(markList);
+  const myZone = lastZone(markList);
 
   return (
     <View style={styles.root}>
@@ -368,7 +380,16 @@ export default function App() {
 
           {!picking ? (
             <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-              <ResultBoard destId={destId} adv={adv} lineId={lineId} vote={vote} saveVote={saveVote} />
+              <ResultBoard
+                destId={destId}
+                adv={adv}
+                lineId={lineId}
+                markStats={markStats}
+                myZone={myZone}
+                saveMark={saveMark}
+                exportMarks={exportMarks}
+                hasMarks={Object.keys(marks).length > 0}
+              />
             </View>
           ) : null}
         </KeyboardAvoidingView>
@@ -377,7 +398,16 @@ export default function App() {
   );
 }
 
-function ResultBoard({ destId, adv, lineId, vote, saveVote }) {
+function ResultBoard({
+  destId,
+  adv,
+  lineId,
+  markStats,
+  myZone,
+  saveMark,
+  exportMarks,
+  hasMarks,
+}) {
   if (!destId) {
     return (
       <>
@@ -405,18 +435,31 @@ function ResultBoard({ destId, adv, lineId, vote, saveVote }) {
       </>
     );
   }
+
+  const conf =
+    adv.origin === "users"
+      ? "Marcado por quem usa o app neste sentido."
+      : adv.origin === "seed"
+        ? "Estimado pela geometria da estação — sem visita de campo."
+        : "Marca no desenho do trem depois de descer.";
+  const split = splitPhrase(markStats);
+
   return (
     <>
       <Train
         carCount={adv.carCount}
-        active={adv.cars}
+        active={adv.unknown ? [] : adv.cars}
         any={adv.any}
         lineId={adv.lineId}
         direction={adv.direction}
         compact
+        onZonePress={saveMark}
       />
-      <Text style={styles.headline} accessibilityLiveRegion="polite">
-        {formatCars(adv.cars, adv.any)}
+      <Text
+        style={[styles.headline, adv.unknown && styles.headlineUnknown]}
+        accessibilityLiveRegion="polite"
+      >
+        {adv.unknown ? "Ainda não sabemos nesta plataforma." : formatCars(adv.cars, adv.any)}
       </Text>
       <Text style={styles.sub} numberOfLines={2}>
         {intentPhrase(adv)}
@@ -429,29 +472,39 @@ function ResultBoard({ destId, adv, lineId, vote, saveVote }) {
           {adv.why}
         </Text>
       ) : null}
-      <Text style={styles.conf}>Estimado — ainda não conferimos essa plataforma no campo.</Text>
+      <Text style={styles.conf}>{conf}</Text>
+      {split ? <Text style={styles.conf}>{split}</Text> : null}
       <View style={styles.feedback}>
-        <Text style={styles.muted}>Isso bateu com a plataforma?</Text>
+        <Text style={styles.muted}>Onde ficou a escada (ou a integração)?</Text>
         <View style={styles.voteRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: vote === "yes" }}
-            onPress={() => saveVote("yes")}
-            style={[styles.vote, vote === "yes" && styles.voteYes]}
-          >
-            <Text style={[styles.voteText, vote === "yes" && styles.voteOnText]}>Bateu</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: vote === "no" }}
-            onPress={() => saveVote("no")}
-            style={[styles.vote, vote === "no" && styles.voteNo]}
-          >
-            <Text style={[styles.voteText, vote === "no" && styles.voteOnText]}>Não bateu</Text>
-          </Pressable>
+          {["frente", "meio", "fundo"].map((zone) => {
+            const on = myZone === zone;
+            const mapped = zoneToCars(zone, adv.carCount);
+            return (
+              <Pressable
+                key={zone}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={
+                  zone === "frente" ? "ponta da frente" : zone === "meio" ? "meio" : "ponta de trás"
+                }
+                onPress={() => saveMark(zone)}
+                style={[styles.zone, on && styles.onLight]}
+              >
+                <Text style={[styles.zoneName, on && styles.onLightText]}>
+                  {zone === "frente" ? "Frente" : zone === "meio" ? "Meio" : "Trás"}
+                </Text>
+                <Text style={[styles.zoneCars, on && styles.onLightText]}>
+                  {formatCars(mapped.cars, false).replace("carros ", "").replace("carro ", "")}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-        {vote ? (
-          <Text style={styles.conf}>Ficou salvo neste celular. Ajuda na próxima visita de campo.</Text>
+        {hasMarks ? (
+          <Pressable onPress={exportMarks} accessibilityRole="button" hitSlop={8}>
+            <Text style={styles.export}>exportar marcas</Text>
+          </Pressable>
         ) : null}
       </View>
     </>
@@ -631,6 +684,10 @@ const styles = StyleSheet.create({
     fontFamily: "Archivo_800ExtraBold",
     letterSpacing: -0.5,
   },
+  headlineUnknown: {
+    fontSize: 20,
+    lineHeight: 24,
+  },
   sub: {
     marginTop: 4,
     color: colors.enamel,
@@ -665,26 +722,30 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  vote: {
+  zone: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "rgba(243,234,220,0.22)",
     borderRadius: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    alignItems: "center",
   },
-  voteText: {
+  zoneName: {
     color: colors.enamel,
     fontFamily: "Archivo_600SemiBold",
+    fontSize: 14,
   },
-  voteYes: {
-    backgroundColor: colors.ok,
-    borderColor: colors.ok,
+  zoneCars: {
+    color: colors.dust,
+    fontFamily: "Archivo_400Regular",
+    fontSize: 12,
+    marginTop: 2,
   },
-  voteNo: {
-    backgroundColor: colors.danger,
-    borderColor: colors.danger,
-  },
-  voteOnText: {
-    color: colors.enamel,
+  export: {
+    marginTop: 10,
+    color: colors.dust,
+    fontFamily: "Archivo_400Regular",
+    fontSize: 13,
   },
 });
