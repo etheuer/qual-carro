@@ -41,6 +41,7 @@ import {
   publishedFromMarks,
   setMark,
 } from "./src/marks.js";
+import { fetchReports, postReport } from "./src/sync.js";
 import { Train } from "./src/components/Train.js";
 import { StationField } from "./src/components/StationField.js";
 import { colors } from "./src/theme.js";
@@ -68,6 +69,7 @@ export default function App() {
   const [intent, setIntent] = useState("escada");
   const [transferTo, setTransferTo] = useState(null);
   const [marks, setMarks] = useState({});
+  const [remotePublished, setRemotePublished] = useState({});
 
   useEffect(() => {
     AsyncStorage.getItem(MARKS_KEY).then((raw) => {
@@ -75,6 +77,9 @@ export default function App() {
       const next = normalizeStore(JSON.parse(raw));
       setMarks(next);
       AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
+    });
+    fetchReports().then((snap) => {
+      if (snap?.published) setRemotePublished(snap.published);
     });
   }, []);
 
@@ -86,7 +91,10 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  const published = useMemo(() => publishedFromMarks(marks), [marks]);
+  const published = useMemo(
+    () => ({ ...publishedFromMarks(marks), ...remotePublished }),
+    [marks, remotePublished]
+  );
   const adv = useMemo(
     () =>
       currentAdvice({ destId, originId, lineId, direction, intent, transferTo, published }),
@@ -150,6 +158,8 @@ export default function App() {
     const next = setMark(marks, adviceKey(adv), zone);
     setMarks(next);
     await AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
+    const snap = await postReport(adviceKey(adv), zone);
+    if (snap?.published) setRemotePublished(snap.published);
   }
 
   useEffect(() => {

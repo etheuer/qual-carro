@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "qualcarro",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -15,8 +16,12 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.qualcarro",
+      "appleTeamId": "A955F6A486",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
@@ -25,6 +30,10 @@
         "backgroundColor": "#241f1b"
       },
       "package": "app.qualcarro"
-    }
+    },
+    "extra": {
+      "reportsUrl": ""
+    },
+    "plugins": ["expo-dev-client"]
   }
 }

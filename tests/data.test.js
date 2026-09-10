@@ -5,6 +5,7 @@ import { findPath, firstAlighting } from "../src/router.js";
 import { currentAdvice, formatCars } from "../src/lookup.js";
 import { SEED_CELLS, getAdvice, zoneToCars } from "../src/cells.js";
 import { addMark, publishedFromMarks, setMark, lastZone, tally, PUBLISH_MIN } from "../src/marks.js";
+import { applyVote, aggregateVotes } from "../src/reports.js";
 
 describe("station graph", () => {
   it("names every id in LINE_ORDER", () => {
@@ -113,6 +114,33 @@ describe("marks", () => {
     assert.equal(a.zone, "frente");
     assert.equal(a.origin, "users");
     assert.deepEqual(a.cars, [1, 2]);
+  });
+});
+
+describe("shared reports", () => {
+  it("counts one vote per device per cell", () => {
+    let db = { votes: {} };
+    db = applyVote(db, { deviceId: "a", key: "se|1|Tucuruvi|escada", zone: "frente" });
+    db = applyVote(db, { deviceId: "a", key: "se|1|Tucuruvi|escada", zone: "meio" });
+    db = applyVote(db, { deviceId: "b", key: "se|1|Tucuruvi|escada", zone: "frente" });
+    const snap = aggregateVotes(db.votes);
+    assert.equal(snap.cells["se|1|Tucuruvi|escada"].n, 2);
+    assert.equal(snap.cells["se|1|Tucuruvi|escada"].counts.meio, 1);
+    assert.equal(snap.cells["se|1|Tucuruvi|escada"].counts.frente, 1);
+    assert.equal(snap.published["se|1|Tucuruvi|escada"], undefined);
+  });
+
+  it("publishes when five devices agree", () => {
+    let db = { votes: {} };
+    for (let i = 0; i < 5; i++) {
+      db = applyVote(db, {
+        deviceId: `d${i}`,
+        key: "se|1|Tucuruvi|escada",
+        zone: "fundo",
+      });
+    }
+    const snap = aggregateVotes(db.votes);
+    assert.equal(snap.published["se|1|Tucuruvi|escada"].zone, "fundo");
   });
 });
 
