@@ -59,7 +59,11 @@ export function Train({
       </Svg>
       <View style={[styles.front, compact && styles.frontCompact]}>
         <View style={styles.nose} />
-        <Text style={styles.frontText}>frente do trem · sentido {direction ?? "—"}</Text>
+        <Text style={styles.frontText}>
+          {direction
+            ? `sentido ${direction} — carro 1 é a frente`
+            : "cada número é um carro — carro 1 é a frente"}
+        </Text>
       </View>
     </View>
   );

@@ -49,11 +49,12 @@ export function transferOptions(stationId, lineId) {
 }
 
 export function intentPhrase(adv) {
+  const dest = stationTitle(adv.stationId);
   if (adv.intent === "transfer" && adv.transferTo) {
-    return `pra integração com a ${LINES[adv.transferTo].name}`;
+    return `Na ${dest}, pra integração com a ${LINES[adv.transferTo].name}`;
   }
-  if (adv.intent === "saida") return "pra saída da rua";
-  return "pra chegar na escada rolante";
+  if (adv.intent === "saida") return `Na ${dest}, pra saída da rua`;
+  return `Na ${dest}, pra escada`;
 }
 
 export function adviceKey(adv) {

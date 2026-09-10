@@ -188,7 +188,7 @@ export default function App() {
         >
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={styles.scroll}
+            contentContainerStyle={[styles.scroll, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             onScrollBeginDrag={Keyboard.dismiss}
@@ -219,8 +219,8 @@ export default function App() {
             />
 
             <StationField
-              label="De onde você sobe, se já souber"
-              placeholder="opcional — monta a rota"
+              label="De onde sobe"
+              placeholder="opcional"
               query={originQuery}
               onChangeQuery={(t) => {
                 setOriginQuery(t);
@@ -249,11 +249,10 @@ export default function App() {
 
             {routed ? (
               <View style={styles.block}>
-                <Text style={styles.kicker}>Rota</Text>
                 {adv.path.legs.map((leg, idx) => {
                   const ln = LINES[leg.lineId];
                   const extra = leg.transferTo
-                    ? ` → ${LINES[leg.transferTo].name} em ${stationTitle(leg.transferAt)}`
+                    ? `  troca pra ${LINES[leg.transferTo].name} em ${stationTitle(leg.transferAt)}`
                     : "";
                   return (
                     <View key={`${leg.lineId}-${idx}`} style={styles.leg}>
@@ -261,9 +260,12 @@ export default function App() {
                         <Text style={[styles.miniText, { color: ln.ink }]}>{ln.short}</Text>
                       </View>
                       <Text style={styles.legText}>
-                        {stationTitle(leg.fromId)} até {stationTitle(leg.toId)}
-                        <Text style={styles.muted}> sentido {leg.direction}</Text>
-                        {extra}
+                        {stationTitle(leg.fromId)} → {stationTitle(leg.toId)}
+                        <Text style={styles.muted}>
+                          {" "}
+                          sentido {leg.direction}
+                          {extra}
+                        </Text>
                       </Text>
                     </View>
                   );
@@ -332,7 +334,7 @@ export default function App() {
                 <View style={styles.intentRow}>
                   {[
                     ["escada", "Escada"],
-                    ["saida", "Saída da rua"],
+                    ["saida", "Saída"],
                     ...(transfers.length ? [["transfer", "Integração"]] : []),
                   ].map(([id, label]) => {
                     const on = intent === id;
@@ -377,42 +379,49 @@ export default function App() {
                 ) : null}
               </View>
             ) : null}
-          </ScrollView>
-
-          {!picking ? (
-            <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            {!picking ? (
               <ResultBoard
                 destId={destId}
                 adv={adv}
                 lineId={lineId}
+                stripe={stripe}
                 myZone={myZone}
                 saveMark={saveMark}
               />
-            </View>
-          ) : null}
+            ) : null}
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
 }
 
-function ResultBoard({ destId, adv, lineId, myZone, saveMark }) {
+function ResultBoard({ destId, adv, lineId, stripe, myZone, saveMark }) {
+  const rail = <View style={[styles.rail, { backgroundColor: stripe }]} />;
+
   if (!destId) {
     return (
-      <>
+      <View style={styles.board}>
+        {rail}
         <Train carCount={6} active={[]} any={false} direction={null} compact />
-        <Text style={styles.muted}>
-          Cada número é um carro do trem. Os pintados, quando houver, são onde entrar.
+        <Text style={styles.sub}>
+          Diz onde você desce. Os carros pintados são onde entrar.
         </Text>
-      </>
+      </View>
     );
   }
   if (adv?.error) {
-    return <Text style={styles.err}>{adv.error}</Text>;
+    return (
+      <View style={styles.board}>
+        {rail}
+        <Text style={styles.err}>{adv.error}</Text>
+      </View>
+    );
   }
   if (adv?.need === "dir") {
     return (
-      <>
+      <View style={styles.board}>
+        {rail}
         <Train
           carCount={LINES[lineId]?.cars ?? 6}
           active={[]}
@@ -420,29 +429,23 @@ function ResultBoard({ destId, adv, lineId, myZone, saveMark }) {
           direction={null}
           compact
         />
-        <Text style={styles.muted}>Agora o sentido. Carro 1 é sempre a frente do trem.</Text>
-      </>
+        <Text style={styles.sub}>Escolhe o sentido. Carro 1 é a frente do trem.</Text>
+      </View>
     );
   }
 
-  const legend = adv.unknown
-    ? "Cada número é um carro. Nenhum pintado: ainda sem resposta."
-    : adv.any
-      ? "Cada número é um carro. Qualquer um serve nesta plataforma."
-      : "Cada número é um carro. Os pintados são onde entrar.";
-  const conf =
-    adv.origin === "users"
-      ? "Resposta de quem já fez essa viagem neste sentido."
-      : adv.origin === "seed"
-        ? "Estimado pela geometria da estação — sem visita de campo."
-        : null;
   const ask =
-    adv.intent === "transfer"
-      ? "Se você já fez essa baldeação: onde ficou a integração?"
-      : "Se você já desceu aqui: onde ficou a escada?";
+    adv.intent === "transfer" ? "Onde ficou a integração?" : "Onde ficou a escada?";
+  const source =
+    adv.origin === "users"
+      ? "Quem já fez essa viagem neste sentido."
+      : adv.origin === "seed"
+        ? "Pela geometria da estação, sem visita de campo."
+        : null;
 
   return (
-    <>
+    <View style={styles.board}>
+      {rail}
       <Train
         carCount={adv.carCount}
         active={adv.unknown ? [] : adv.cars}
@@ -451,55 +454,48 @@ function ResultBoard({ destId, adv, lineId, myZone, saveMark }) {
         direction={adv.direction}
         compact
       />
-      <Text style={styles.legend}>{legend}</Text>
       <Text
         style={[styles.headline, adv.unknown && styles.headlineUnknown]}
         accessibilityLiveRegion="polite"
       >
-        {adv.unknown ? "Ainda não sabemos nesta plataforma." : formatCars(adv.cars, adv.any)}
+        {adv.unknown ? "Sem posição ainda" : formatCars(adv.cars, adv.any)}
       </Text>
-      <Text style={styles.sub} numberOfLines={2}>
-        {intentPhrase(adv)}
-        {adv.routed
-          ? ` · entra em ${stationTitle(adv.boardFromId)}`
-          : ` · desce em ${stationTitle(adv.stationId)}`}
+      <Text style={styles.sub}>
+        {adv.routed ? `Embarque em ${stationTitle(adv.boardFromId)}. ` : ""}
+        {intentPhrase(adv)}.
       </Text>
-      {adv.why ? (
+      {adv.why && !adv.unknown ? (
         <Text style={styles.why} numberOfLines={2}>
           {adv.why}
         </Text>
       ) : null}
-      {conf ? <Text style={styles.conf}>{conf}</Text> : null}
-      <View style={styles.feedback}>
-        <Text style={styles.muted}>{ask}</Text>
-        <View style={styles.voteRow}>
-          {["frente", "meio", "fundo"].map((zone) => {
-            const on = myZone === zone;
-            const mapped = zoneToCars(zone, adv.carCount);
-            return (
-              <Pressable
-                key={zone}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={zoneLabel(zone)}
-                onPress={() => saveMark(zone)}
-                style={[styles.zone, on && styles.onLight]}
-              >
-                <Text style={[styles.zoneName, on && styles.onLightText]}>
-                  {zone === "frente" ? "Frente" : zone === "meio" ? "Meio" : "Trás"}
-                </Text>
-                <Text style={[styles.zoneCars, on && styles.onLightText]}>
-                  {formatCars(mapped.cars, false)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        {myZone ? (
-          <Text style={styles.conf}>Anotado: {zoneLabel(myZone)}.</Text>
-        ) : null}
+      {source ? <Text style={styles.conf}>{source}</Text> : null}
+      <Text style={styles.ask}>{ask}</Text>
+      <View style={styles.voteRow}>
+        {["frente", "meio", "fundo"].map((zone) => {
+          const on = myZone === zone;
+          const mapped = zoneToCars(zone, adv.carCount);
+          return (
+            <Pressable
+              key={zone}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={zoneLabel(zone)}
+              onPress={() => saveMark(zone)}
+              style={[styles.zone, on && styles.onLight]}
+            >
+              <Text style={[styles.zoneName, on && styles.onLightText]}>
+                {zone === "frente" ? "Frente" : zone === "meio" ? "Meio" : "Trás"}
+              </Text>
+              <Text style={[styles.zoneCars, on && styles.onLightText]}>
+                {formatCars(mapped.cars, false)}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
-    </>
+      {myZone ? <Text style={styles.conf}>Você apontou: {zoneLabel(myZone)}.</Text> : null}
+    </View>
   );
 }
 
@@ -538,8 +534,8 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   title: {
-    marginTop: 22,
-    paddingRight: 52,
+    marginTop: 18,
+    paddingRight: 44,
     color: colors.enamel,
     fontSize: 38,
     lineHeight: 40,
@@ -562,11 +558,6 @@ const styles = StyleSheet.create({
   block: {
     marginTop: 16,
     gap: 10,
-  },
-  kicker: {
-    color: colors.dust,
-    fontFamily: "Archivo_400Regular",
-    marginBottom: 4,
   },
   wrapRow: {
     flexDirection: "row",
@@ -612,12 +603,6 @@ const styles = StyleSheet.create({
     color: colors.dust,
     fontFamily: "Archivo_400Regular",
     fontSize: 15,
-  },
-  legend: {
-    color: colors.dust,
-    fontFamily: "Archivo_400Regular",
-    fontSize: 13,
-    marginBottom: 6,
   },
   dirRow: {
     flexDirection: "row",
@@ -668,32 +653,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
   },
-  dock: {
-    paddingHorizontal: 18,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(243,234,220,0.14)",
-    backgroundColor: colors.asphalt,
+  board: {
+    marginTop: 22,
+    paddingTop: 12,
+    paddingBottom: 4,
+    paddingHorizontal: 12,
+    marginHorizontal: -12,
+    backgroundColor: colors.asphalt2,
+  },
+  rail: {
+    height: 4,
+    marginHorizontal: -12,
+    marginTop: -12,
+    marginBottom: 10,
   },
   headline: {
     color: colors.enamel,
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: 30,
+    lineHeight: 34,
     fontFamily: "Archivo_800ExtraBold",
     letterSpacing: -0.5,
+    marginTop: 2,
   },
   headlineUnknown: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 22,
+    lineHeight: 26,
   },
   sub: {
-    marginTop: 4,
+    marginTop: 6,
     color: colors.enamel,
     fontSize: 16,
+    lineHeight: 22,
     fontFamily: "Archivo_400Regular",
   },
   why: {
-    marginTop: 4,
+    marginTop: 6,
     color: colors.dust,
     fontSize: 14,
     fontFamily: "Archivo_400Regular",
@@ -704,16 +698,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Archivo_400Regular",
   },
+  ask: {
+    marginTop: 16,
+    color: colors.dust,
+    fontFamily: "Archivo_400Regular",
+    fontSize: 15,
+  },
   err: {
     color: colors.danger,
     fontFamily: "Archivo_400Regular",
     fontSize: 16,
-  },
-  feedback: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(243,234,220,0.14)",
+    paddingVertical: 8,
   },
   voteRow: {
     flexDirection: "row",
