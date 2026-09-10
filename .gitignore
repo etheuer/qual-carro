@@ -18,4 +18,5 @@ build/
 server/data.json
 .reports-url
 .env
+.wrangler/
 

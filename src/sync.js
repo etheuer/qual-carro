@@ -11,6 +11,17 @@ export function reportsUrl() {
   return String(url || "").replace(/\/$/, "");
 }
 
+function candidateUrls() {
+  const primary = reportsUrl();
+  const urls = [];
+  if (primary) urls.push(primary);
+  if (typeof __DEV__ !== "undefined" && __DEV__) {
+    const local = "http://127.0.0.1:4132";
+    if (!urls.includes(local)) urls.push(local);
+  }
+  return urls;
+}
+
 export async function getDeviceId() {
   let id = await AsyncStorage.getItem(DEVICE_KEY);
   if (id) return id;
@@ -20,20 +31,33 @@ export async function getDeviceId() {
 }
 
 async function request(path, opts = {}) {
-  const base = reportsUrl();
-  if (!base) return null;
-  const res = await fetch(`${base}${path}`, {
-    ...opts,
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      "ngrok-skip-browser-warning": "true",
-      ...(opts.headers || {}),
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`reports ${res.status} ${text.slice(0, 80)}`);
-  return JSON.parse(text);
+  const urls = candidateUrls();
+  if (!urls.length) return null;
+  let lastErr;
+  for (const base of urls) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      const res = await fetch(`${base}${path}`, {
+        ...opts,
+        signal: ctrl.signal,
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+          ...(opts.headers || {}),
+        },
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`reports ${res.status} ${text.slice(0, 80)}`);
+      return JSON.parse(text);
+    } catch (err) {
+      lastErr = err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastErr || new Error("reports unreachable");
 }
 
 export async function fetchReports() {

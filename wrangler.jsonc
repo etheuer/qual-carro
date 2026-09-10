@@ -1,0 +1,20 @@
+{
+  "name": "qual-carro-reports",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2026-09-10",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "STORE",
+        "class_name": "ReportsStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ReportsStore"]
+    }
+  ]
+}

@@ -10,6 +10,7 @@
     "android": "expo start --android --dev-client",
     "device": "expo run:ios --device",
     "reports": "node server/index.mjs",
+    "reports:deploy": "wrangler deploy",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
