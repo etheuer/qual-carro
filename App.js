@@ -5,7 +5,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -34,14 +33,13 @@ import {
   stationTitle,
   transferOptions,
 } from "./src/lookup.js";
-import { zoneToCars } from "./src/cells.js";
+import { zoneLabel, zoneToCars } from "./src/cells.js";
 import {
   MARKS_KEY,
-  addMark,
   lastZone,
+  normalizeStore,
   publishedFromMarks,
-  splitPhrase,
-  tally,
+  setMark,
 } from "./src/marks.js";
 import { Train } from "./src/components/Train.js";
 import { StationField } from "./src/components/StationField.js";
@@ -73,7 +71,10 @@ export default function App() {
 
   useEffect(() => {
     AsyncStorage.getItem(MARKS_KEY).then((raw) => {
-      if (raw) setMarks(JSON.parse(raw));
+      if (!raw) return;
+      const next = normalizeStore(JSON.parse(raw));
+      setMarks(next);
+      AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
     });
   }, []);
 
@@ -146,18 +147,9 @@ export default function App() {
 
   async function saveMark(zone) {
     if (!adv || adv.error || adv.need) return;
-    const next = addMark(marks, adviceKey(adv), zone);
+    const next = setMark(marks, adviceKey(adv), zone);
     setMarks(next);
     await AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
-  }
-
-  async function exportMarks() {
-    const keys = Object.keys(marks);
-    if (!keys.length) return;
-    await Share.share({
-      title: "qual-carro-marks",
-      message: JSON.stringify({ v: 1, at: Date.now(), marks }, null, 2),
-    });
   }
 
   useEffect(() => {
@@ -168,9 +160,8 @@ export default function App() {
     return <View style={styles.root} />;
   }
 
-  const markList = adv && !adv.error && !adv.need ? marks[adviceKey(adv)] : null;
-  const markStats = tally(markList);
-  const myZone = lastZone(markList);
+  const myZone =
+    adv && !adv.error && !adv.need ? lastZone(marks[adviceKey(adv)]) : null;
 
   return (
     <View style={styles.root}>
@@ -384,11 +375,8 @@ export default function App() {
                 destId={destId}
                 adv={adv}
                 lineId={lineId}
-                markStats={markStats}
                 myZone={myZone}
                 saveMark={saveMark}
-                exportMarks={exportMarks}
-                hasMarks={Object.keys(marks).length > 0}
               />
             </View>
           ) : null}
@@ -398,22 +386,13 @@ export default function App() {
   );
 }
 
-function ResultBoard({
-  destId,
-  adv,
-  lineId,
-  markStats,
-  myZone,
-  saveMark,
-  exportMarks,
-  hasMarks,
-}) {
+function ResultBoard({ destId, adv, lineId, myZone, saveMark }) {
   if (!destId) {
     return (
       <>
         <Train carCount={6} active={[]} any={false} direction={null} compact />
         <Text style={styles.muted}>
-          Escolhe onde você desce. O desenho do trem diz em qual carro entrar.
+          Cada número é um carro do trem. Os pintados, quando houver, são onde entrar.
         </Text>
       </>
     );
@@ -436,13 +415,21 @@ function ResultBoard({
     );
   }
 
+  const legend = adv.unknown
+    ? "Cada número é um carro. Nenhum pintado: ainda sem resposta."
+    : adv.any
+      ? "Cada número é um carro. Qualquer um serve nesta plataforma."
+      : "Cada número é um carro. Os pintados são onde entrar.";
   const conf =
     adv.origin === "users"
-      ? "Marcado por quem usa o app neste sentido."
+      ? "Resposta de quem já fez essa viagem neste sentido."
       : adv.origin === "seed"
         ? "Estimado pela geometria da estação — sem visita de campo."
-        : "Marca no desenho do trem depois de descer.";
-  const split = splitPhrase(markStats);
+        : null;
+  const ask =
+    adv.intent === "transfer"
+      ? "Se você já fez essa baldeação: onde ficou a integração?"
+      : "Se você já desceu aqui: onde ficou a escada?";
 
   return (
     <>
@@ -453,8 +440,8 @@ function ResultBoard({
         lineId={adv.lineId}
         direction={adv.direction}
         compact
-        onZonePress={saveMark}
       />
+      <Text style={styles.legend}>{legend}</Text>
       <Text
         style={[styles.headline, adv.unknown && styles.headlineUnknown]}
         accessibilityLiveRegion="polite"
@@ -472,10 +459,9 @@ function ResultBoard({
           {adv.why}
         </Text>
       ) : null}
-      <Text style={styles.conf}>{conf}</Text>
-      {split ? <Text style={styles.conf}>{split}</Text> : null}
+      {conf ? <Text style={styles.conf}>{conf}</Text> : null}
       <View style={styles.feedback}>
-        <Text style={styles.muted}>Onde ficou a escada (ou a integração)?</Text>
+        <Text style={styles.muted}>{ask}</Text>
         <View style={styles.voteRow}>
           {["frente", "meio", "fundo"].map((zone) => {
             const on = myZone === zone;
@@ -485,9 +471,7 @@ function ResultBoard({
                 key={zone}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
-                accessibilityLabel={
-                  zone === "frente" ? "ponta da frente" : zone === "meio" ? "meio" : "ponta de trás"
-                }
+                accessibilityLabel={zoneLabel(zone)}
                 onPress={() => saveMark(zone)}
                 style={[styles.zone, on && styles.onLight]}
               >
@@ -495,16 +479,14 @@ function ResultBoard({
                   {zone === "frente" ? "Frente" : zone === "meio" ? "Meio" : "Trás"}
                 </Text>
                 <Text style={[styles.zoneCars, on && styles.onLightText]}>
-                  {formatCars(mapped.cars, false).replace("carros ", "").replace("carro ", "")}
+                  {formatCars(mapped.cars, false)}
                 </Text>
               </Pressable>
             );
           })}
         </View>
-        {hasMarks ? (
-          <Pressable onPress={exportMarks} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.export}>exportar marcas</Text>
-          </Pressable>
+        {myZone ? (
+          <Text style={styles.conf}>Anotado: {zoneLabel(myZone)}.</Text>
         ) : null}
       </View>
     </>
@@ -620,6 +602,12 @@ const styles = StyleSheet.create({
     color: colors.dust,
     fontFamily: "Archivo_400Regular",
     fontSize: 15,
+  },
+  legend: {
+    color: colors.dust,
+    fontFamily: "Archivo_400Regular",
+    fontSize: 13,
+    marginBottom: 6,
   },
   dirRow: {
     flexDirection: "row",
@@ -741,11 +729,5 @@ const styles = StyleSheet.create({
     fontFamily: "Archivo_400Regular",
     fontSize: 12,
     marginTop: 2,
-  },
-  export: {
-    marginTop: 10,
-    color: colors.dust,
-    fontFamily: "Archivo_400Regular",
-    fontSize: 13,
   },
 });

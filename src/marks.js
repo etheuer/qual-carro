@@ -4,17 +4,41 @@ export const PUBLISH_RATIO = 0.7;
 
 const EMPTY = { frente: 0, meio: 0, fundo: 0, qualquer: 0 };
 
+export function asList(entry) {
+  if (!entry) return [];
+  if (Array.isArray(entry)) return entry;
+  if (entry.zone) return [entry];
+  return [];
+}
+
+export function normalizeStore(raw) {
+  const out = {};
+  for (const [key, entry] of Object.entries(raw || {})) {
+    const list = asList(entry);
+    if (!list.length) continue;
+    const last = list[list.length - 1];
+    out[key] = { zone: last.zone, at: last.at };
+  }
+  return out;
+}
+
+/** One answer per cell on this phone. A new tap replaces the last. */
+export function setMark(store, key, zone) {
+  return { ...store, [key]: { zone, at: Date.now() } };
+}
+
 export function addMark(store, key, zone) {
-  const list = [...(store[key] || []), { zone, at: Date.now() }];
+  const list = [...asList(store[key]), { zone, at: Date.now() }];
   return { ...store, [key]: list };
 }
 
 export function tally(marks) {
+  const list = asList(marks);
   const counts = { ...EMPTY };
-  for (const m of marks || []) {
+  for (const m of list) {
     if (counts[m.zone] != null) counts[m.zone] += 1;
   }
-  const n = (marks || []).length;
+  const n = list.length;
   let best = null;
   let bestN = 0;
   for (const [zone, c] of Object.entries(counts)) {
@@ -49,18 +73,8 @@ export function publishedFromMarks(store) {
   return out;
 }
 
-export function splitPhrase(t) {
-  if (!t?.n) return null;
-  const parts = [];
-  if (t.counts.frente) parts.push(`${t.counts.frente} na ponta da frente`);
-  if (t.counts.meio) parts.push(`${t.counts.meio} no meio`);
-  if (t.counts.fundo) parts.push(`${t.counts.fundo} na ponta de trás`);
-  if (t.counts.qualquer) parts.push(`${t.counts.qualquer} qualquer`);
-  const noun = t.n === 1 ? "marca" : "marcas";
-  return `${t.n} ${noun}: ${parts.join(", ")}.`;
-}
-
-export function lastZone(marks) {
-  if (!marks?.length) return null;
-  return marks[marks.length - 1].zone;
+export function lastZone(entry) {
+  const list = asList(entry);
+  if (!list.length) return null;
+  return list[list.length - 1].zone;
 }

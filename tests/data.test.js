@@ -4,7 +4,7 @@ import { LINE_ORDER, LINES, STATION_NAMES, linesAt, searchStations } from "../sr
 import { findPath, firstAlighting } from "../src/router.js";
 import { currentAdvice, formatCars } from "../src/lookup.js";
 import { SEED_CELLS, getAdvice, zoneToCars } from "../src/cells.js";
-import { addMark, publishedFromMarks, tally, PUBLISH_MIN } from "../src/marks.js";
+import { addMark, publishedFromMarks, setMark, lastZone, tally, PUBLISH_MIN } from "../src/marks.js";
 
 describe("station graph", () => {
   it("names every id in LINE_ORDER", () => {
@@ -88,6 +88,14 @@ describe("marks", () => {
     for (let i = 0; i < PUBLISH_MIN; i++) store = addMark(store, key, "frente");
     const pub = publishedFromMarks(store);
     assert.equal(pub[key].zone, "frente");
+  });
+
+  it("keeps a single answer per cell on this phone", () => {
+    let store = {};
+    store = setMark(store, "se|1|Tucuruvi|escada", "frente");
+    store = setMark(store, "se|1|Tucuruvi|escada", "meio");
+    assert.equal(lastZone(store["se|1|Tucuruvi|escada"]), "meio");
+    assert.equal(tally(store["se|1|Tucuruvi|escada"]).n, 1);
   });
 
   it("lets published user marks override a seed", () => {
