@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +12,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useFonts,
   Archivo_400Regular,
@@ -40,6 +42,7 @@ const FEEDBACK_KEY = "qual-carro-feedback";
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
+  const insets = useSafeAreaInsets();
   const [fontsLoaded] = useFonts({
     Archivo: Archivo_400Regular,
     Archivo_400Regular,
@@ -66,6 +69,14 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidHide", () => {
+      setDestOpen(false);
+      setOriginOpen(false);
+    });
+    return () => sub.remove();
+  }, []);
+
   const adv = useMemo(
     () => currentAdvice({ destId, originId, lineId, direction, intent, transferTo }),
     [destId, originId, lineId, direction, intent, transferTo]
@@ -75,6 +86,7 @@ export default function App() {
   const activeLineId = adv?.lineId || lineId;
   const line = activeLineId ? LINES[activeLineId] : null;
   const stripe = line?.color ?? colors.idleLine;
+  const picking = destOpen || originOpen;
 
   useEffect(() => {
     if (routed && adv?.lineId) {
@@ -85,10 +97,10 @@ export default function App() {
 
   useEffect(() => {
     if (!destId || routed) return;
-    const lines = metroLines(destId);
-    if (!lines.length) return;
-    if (!lineId || !lines.includes(lineId)) {
-      setLineId(lines[0]);
+    const next = metroLines(destId);
+    if (!next.length) return;
+    if (!lineId || !next.includes(lineId)) {
+      setLineId(next[0]);
       setDirection(null);
       setIntent("escada");
       setTransferTo(null);
@@ -157,270 +169,292 @@ export default function App() {
       />
       <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
         <View style={[styles.stripe, { backgroundColor: stripe }]} />
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={Keyboard.dismiss}
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <Text style={styles.title}>Qual carro?</Text>
-          <Text style={styles.lede}>
-            Metrô de São Paulo. Entra no carro certo pra não atravessar a plataforma inteira.
-          </Text>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScrollBeginDrag={Keyboard.dismiss}
+          >
+            <Text style={[styles.title, destId && styles.titleOn]}>Qual carro?</Text>
+            {!destId ? (
+              <Text style={styles.lede}>
+                Metrô de São Paulo. Entra no carro certo pra não atravessar a plataforma inteira.
+              </Text>
+            ) : null}
 
-          <StationField
-            label="Onde você desce"
-            placeholder="Sé, Luz, Paraíso…"
-            query={destQuery}
-            onChangeQuery={(t) => {
-              setDestQuery(t);
-              setDestId(null);
-              setDestOpen(true);
-            }}
-            onFocus={() => {
-              setDestOpen(true);
-              setOriginOpen(false);
-            }}
-            onPick={pickDest}
-            open={destOpen}
-            excludeId={originId}
-          />
+            <StationField
+              label="Onde você desce"
+              placeholder="Sé, Luz, Paraíso…"
+              query={destQuery}
+              onChangeQuery={(t) => {
+                setDestQuery(t);
+                setDestId(null);
+                setDestOpen(true);
+              }}
+              onFocus={() => {
+                setDestOpen(true);
+                setOriginOpen(false);
+              }}
+              onPick={pickDest}
+              open={destOpen}
+              excludeId={originId}
+            />
 
-          <StationField
-            label="De onde você sobe, se já souber"
-            placeholder="opcional — monta a rota"
-            query={originQuery}
-            onChangeQuery={(t) => {
-              setOriginQuery(t);
-              if (!t.trim()) {
+            <StationField
+              label="De onde você sobe, se já souber"
+              placeholder="opcional — monta a rota"
+              query={originQuery}
+              onChangeQuery={(t) => {
+                setOriginQuery(t);
+                if (!t.trim()) {
+                  setOriginId(null);
+                  setOriginOpen(true);
+                  return;
+                }
                 setOriginId(null);
                 setOriginOpen(true);
-                return;
-              }
-              setOriginId(null);
-              setOriginOpen(true);
-            }}
-            onFocus={() => {
-              setOriginOpen(true);
-              setDestOpen(false);
-            }}
-            onPick={pickOrigin}
-            open={originOpen}
-            excludeId={destId}
-            showClear={Boolean(originId || originQuery)}
-            onClear={() => {
-              setOriginId(null);
-              setOriginQuery("");
-            }}
-          />
+              }}
+              onFocus={() => {
+                setOriginOpen(true);
+                setDestOpen(false);
+              }}
+              onPick={pickOrigin}
+              open={originOpen}
+              excludeId={destId}
+              showClear={Boolean(originId || originQuery)}
+              onClear={() => {
+                setOriginId(null);
+                setOriginQuery("");
+                setOriginOpen(false);
+              }}
+            />
 
-          {routed ? (
-            <View style={styles.block}>
-              <Text style={styles.kicker}>Rota</Text>
-              {adv.path.legs.map((leg, idx) => {
-                const ln = LINES[leg.lineId];
-                const extra = leg.transferTo
-                  ? ` → ${LINES[leg.transferTo].name} em ${stationTitle(leg.transferAt)}`
-                  : "";
-                return (
-                  <View key={`${leg.lineId}-${idx}`} style={styles.leg}>
-                    <View style={[styles.mini, { backgroundColor: ln.color }]}>
-                      <Text style={[styles.miniText, { color: ln.ink }]}>{ln.short}</Text>
-                    </View>
-                    <Text style={styles.legText}>
-                      {stationTitle(leg.fromId)} até {stationTitle(leg.toId)}
-                      <Text style={styles.muted}> sentido {leg.direction}</Text>
-                      {extra}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          ) : destId && lines.length ? (
-            <View style={styles.block}>
-              {lines.length > 1 ? (
-                <View style={styles.wrapRow}>
-                  {lines.map((id) => {
-                    const on = lineId === id;
-                    return (
-                      <Pressable
-                        key={id}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: on }}
-                        onPress={() => {
-                          setLineId(id);
-                          setDirection(null);
-                          setIntent("escada");
-                        }}
-                        style={[
-                          styles.chipBtn,
-                          on && { backgroundColor: lineColor(id), borderColor: lineColor(id) },
-                        ]}
-                      >
-                        <Text style={[styles.chipBtnText, on && { color: lineInk(id) }]}>
-                          {LINES[id].short} {LINES[id].name.replace(/^\d+-/, "")}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : line ? (
-                <View style={styles.leg}>
-                  <View style={[styles.mini, { backgroundColor: line.color }]}>
-                    <Text style={[styles.miniText, { color: line.ink }]}>{line.short}</Text>
-                  </View>
-                  <Text style={styles.legText}>{line.name}</Text>
-                </View>
-              ) : null}
-              {line ? (
-                <View style={styles.dirRow}>
-                  {line.terminals.map((t) => {
-                    const on = direction === t;
-                    return (
-                      <Pressable
-                        key={t}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: on }}
-                        onPress={() => setDirection(t)}
-                        style={[styles.dir, on && styles.onLight]}
-                      >
-                        <Text style={[styles.dirLabel, on && styles.onLightText]}>sentido</Text>
-                        <Text style={[styles.dirName, on && styles.onLightText]}>{t}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          {destId && lineId && !routed ? (
-            <View style={styles.block}>
-              <View style={styles.intentRow}>
-                {[
-                  ["escada", "Escada"],
-                  ["saida", "Saída da rua"],
-                  ...(transfers.length ? [["transfer", "Integração"]] : []),
-                ].map(([id, label]) => {
-                  const on = intent === id;
+            {routed ? (
+              <View style={styles.block}>
+                <Text style={styles.kicker}>Rota</Text>
+                {adv.path.legs.map((leg, idx) => {
+                  const ln = LINES[leg.lineId];
+                  const extra = leg.transferTo
+                    ? ` → ${LINES[leg.transferTo].name} em ${stationTitle(leg.transferAt)}`
+                    : "";
                   return (
-                    <Pressable
-                      key={id}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: on }}
-                      onPress={() => setIntent(id)}
-                      style={[styles.intent, on && styles.onLight]}
-                    >
-                      <Text style={[styles.intentText, on && styles.onLightText]}>{label}</Text>
-                    </Pressable>
+                    <View key={`${leg.lineId}-${idx}`} style={styles.leg}>
+                      <View style={[styles.mini, { backgroundColor: ln.color }]}>
+                        <Text style={[styles.miniText, { color: ln.ink }]}>{ln.short}</Text>
+                      </View>
+                      <Text style={styles.legText}>
+                        {stationTitle(leg.fromId)} até {stationTitle(leg.toId)}
+                        <Text style={styles.muted}> sentido {leg.direction}</Text>
+                        {extra}
+                      </Text>
+                    </View>
                   );
                 })}
               </View>
-              {intent === "transfer" && transfers.length ? (
-                <View style={styles.wrapRow}>
-                  {transfers.map((id) => {
-                    const on = transferTo === id;
+            ) : destId && lines.length ? (
+              <View style={styles.block}>
+                {lines.length > 1 ? (
+                  <View style={styles.wrapRow}>
+                    {lines.map((id) => {
+                      const on = lineId === id;
+                      return (
+                        <Pressable
+                          key={id}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          onPress={() => {
+                            setLineId(id);
+                            setDirection(null);
+                            setIntent("escada");
+                          }}
+                          style={[
+                            styles.chipBtn,
+                            on && { backgroundColor: lineColor(id), borderColor: lineColor(id) },
+                          ]}
+                        >
+                          <Text style={[styles.chipBtnText, on && { color: lineInk(id) }]}>
+                            {LINES[id].short} {LINES[id].name.replace(/^\d+-/, "")}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : line ? (
+                  <View style={styles.leg}>
+                    <View style={[styles.mini, { backgroundColor: line.color }]}>
+                      <Text style={[styles.miniText, { color: line.ink }]}>{line.short}</Text>
+                    </View>
+                    <Text style={styles.legText}>{line.name}</Text>
+                  </View>
+                ) : null}
+                {line ? (
+                  <View style={styles.dirRow}>
+                    {line.terminals.map((t) => {
+                      const on = direction === t;
+                      return (
+                        <Pressable
+                          key={t}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          onPress={() => setDirection(t)}
+                          style={[styles.dir, on && styles.onLight]}
+                        >
+                          <Text style={[styles.dirLabel, on && styles.onLightText]}>sentido</Text>
+                          <Text style={[styles.dirName, on && styles.onLightText]}>{t}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {destId && lineId && !routed ? (
+              <View style={styles.block}>
+                <View style={styles.intentRow}>
+                  {[
+                    ["escada", "Escada"],
+                    ["saida", "Saída da rua"],
+                    ...(transfers.length ? [["transfer", "Integração"]] : []),
+                  ].map(([id, label]) => {
+                    const on = intent === id;
                     return (
                       <Pressable
                         key={id}
                         accessibilityRole="button"
                         accessibilityState={{ selected: on }}
-                        onPress={() => {
-                          setTransferTo(id);
-                          setIntent("transfer");
-                        }}
-                        style={[
-                          styles.chipBtn,
-                          on && { backgroundColor: lineColor(id), borderColor: lineColor(id) },
-                        ]}
+                        onPress={() => setIntent(id)}
+                        style={[styles.intent, on && styles.onLight]}
                       >
-                        <Text style={[styles.chipBtnText, on && { color: lineInk(id) }]}>
-                          {LINES[id].name}
-                        </Text>
+                        <Text style={[styles.intentText, on && styles.onLightText]}>{label}</Text>
                       </Pressable>
                     );
                   })}
                 </View>
-              ) : null}
+                {intent === "transfer" && transfers.length ? (
+                  <View style={styles.wrapRow}>
+                    {transfers.map((id) => {
+                      const on = transferTo === id;
+                      return (
+                        <Pressable
+                          key={id}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          onPress={() => {
+                            setTransferTo(id);
+                            setIntent("transfer");
+                          }}
+                          style={[
+                            styles.chipBtn,
+                            on && { backgroundColor: lineColor(id), borderColor: lineColor(id) },
+                          ]}
+                        >
+                          <Text style={[styles.chipBtnText, on && { color: lineInk(id) }]}>
+                            {LINES[id].name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </ScrollView>
+
+          {!picking ? (
+            <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+              <ResultBoard destId={destId} adv={adv} lineId={lineId} vote={vote} saveVote={saveVote} />
             </View>
           ) : null}
-
-          <View style={styles.result}>
-            {!destId ? (
-              <>
-                <Train carCount={6} active={[]} any={false} direction={null} />
-                <Text style={styles.muted}>
-                  Escolhe onde você desce. O desenho do trem diz em qual carro entrar.
-                </Text>
-              </>
-            ) : adv?.error ? (
-              <Text style={styles.err}>{adv.error}</Text>
-            ) : adv?.need === "dir" ? (
-              <>
-                <Train
-                  carCount={LINES[lineId]?.cars ?? 6}
-                  active={[]}
-                  lineId={lineId}
-                  direction={null}
-                />
-                <Text style={styles.muted}>Agora o sentido. Carro 1 é sempre a frente do trem.</Text>
-              </>
-            ) : (
-              <>
-                <Train
-                  carCount={adv.carCount}
-                  active={adv.cars}
-                  any={adv.any}
-                  lineId={adv.lineId}
-                  direction={adv.direction}
-                />
-                <Text style={styles.headline} accessibilityLiveRegion="polite">
-                  {formatCars(adv.cars, adv.any)}
-                </Text>
-                <Text style={styles.sub}>
-                  {intentPhrase(adv)}
-                  {adv.routed
-                    ? ` · entra em ${stationTitle(adv.boardFromId)}`
-                    : ` · desce em ${stationTitle(adv.stationId)}`}
-                </Text>
-                <Text style={styles.why}>{adv.why}</Text>
-                <Text style={styles.conf}>
-                  Estimado — ainda não conferimos essa plataforma no campo.
-                </Text>
-                <View style={styles.feedback}>
-                  <Text style={styles.muted}>Isso bateu com a plataforma?</Text>
-                  <View style={styles.voteRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: vote === "yes" }}
-                      onPress={() => saveVote("yes")}
-                      style={[styles.vote, vote === "yes" && styles.voteYes]}
-                    >
-                      <Text style={[styles.voteText, vote === "yes" && styles.voteOnText]}>Bateu</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: vote === "no" }}
-                      onPress={() => saveVote("no")}
-                      style={[styles.vote, vote === "no" && styles.voteNo]}
-                    >
-                      <Text style={[styles.voteText, vote === "no" && styles.voteOnText]}>Não bateu</Text>
-                    </Pressable>
-                  </View>
-                  {vote ? (
-                    <Text style={styles.conf}>Ficou salvo neste celular. Ajuda na próxima visita de campo.</Text>
-                  ) : null}
-                </View>
-              </>
-            )}
-          </View>
-
-          <Text style={styles.foot}>
-            Posições de carro são estimadas a partir do tipo de plataforma (Wikipedia / Metrô SP). Ainda
-            não houve visita de campo. Carro 1 é a frente do trem, no sentido que você escolheu.
-          </Text>
-        </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
+  );
+}
+
+function ResultBoard({ destId, adv, lineId, vote, saveVote }) {
+  if (!destId) {
+    return (
+      <>
+        <Train carCount={6} active={[]} any={false} direction={null} compact />
+        <Text style={styles.muted}>
+          Escolhe onde você desce. O desenho do trem diz em qual carro entrar.
+        </Text>
+      </>
+    );
+  }
+  if (adv?.error) {
+    return <Text style={styles.err}>{adv.error}</Text>;
+  }
+  if (adv?.need === "dir") {
+    return (
+      <>
+        <Train
+          carCount={LINES[lineId]?.cars ?? 6}
+          active={[]}
+          lineId={lineId}
+          direction={null}
+          compact
+        />
+        <Text style={styles.muted}>Agora o sentido. Carro 1 é sempre a frente do trem.</Text>
+      </>
+    );
+  }
+  return (
+    <>
+      <Train
+        carCount={adv.carCount}
+        active={adv.cars}
+        any={adv.any}
+        lineId={adv.lineId}
+        direction={adv.direction}
+        compact
+      />
+      <Text style={styles.headline} accessibilityLiveRegion="polite">
+        {formatCars(adv.cars, adv.any)}
+      </Text>
+      <Text style={styles.sub} numberOfLines={2}>
+        {intentPhrase(adv)}
+        {adv.routed
+          ? ` · entra em ${stationTitle(adv.boardFromId)}`
+          : ` · desce em ${stationTitle(adv.stationId)}`}
+      </Text>
+      {adv.why ? (
+        <Text style={styles.why} numberOfLines={2}>
+          {adv.why}
+        </Text>
+      ) : null}
+      <Text style={styles.conf}>Estimado — ainda não conferimos essa plataforma no campo.</Text>
+      <View style={styles.feedback}>
+        <Text style={styles.muted}>Isso bateu com a plataforma?</Text>
+        <View style={styles.voteRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: vote === "yes" }}
+            onPress={() => saveVote("yes")}
+            style={[styles.vote, vote === "yes" && styles.voteYes]}
+          >
+            <Text style={[styles.voteText, vote === "yes" && styles.voteOnText]}>Bateu</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: vote === "no" }}
+            onPress={() => saveVote("no")}
+            style={[styles.vote, vote === "no" && styles.voteNo]}
+          >
+            <Text style={[styles.voteText, vote === "no" && styles.voteOnText]}>Não bateu</Text>
+          </Pressable>
+        </View>
+        {vote ? (
+          <Text style={styles.conf}>Ficou salvo neste celular. Ajuda na próxima visita de campo.</Text>
+        ) : null}
+      </View>
+    </>
   );
 }
 
@@ -438,6 +472,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.asphalt,
   },
+  flex: {
+    flex: 1,
+  },
   wash: {
     position: "absolute",
     top: 0,
@@ -453,15 +490,21 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 18,
-    paddingBottom: 48,
+    paddingBottom: 16,
   },
   title: {
     marginTop: 22,
+    paddingRight: 52,
     color: colors.enamel,
     fontSize: 38,
     lineHeight: 40,
     fontFamily: "Archivo_800ExtraBold",
     letterSpacing: -0.6,
+  },
+  titleOn: {
+    marginTop: 8,
+    fontSize: 26,
+    lineHeight: 28,
   },
   lede: {
     marginTop: 10,
@@ -472,7 +515,7 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
   block: {
-    marginTop: 20,
+    marginTop: 16,
     gap: 10,
   },
   kicker: {
@@ -531,17 +574,17 @@ const styles = StyleSheet.create({
   },
   dir: {
     flex: 1,
-    minHeight: 64,
+    minHeight: 56,
     borderWidth: 1,
     borderColor: "rgba(243,234,220,0.22)",
     borderRadius: 6,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 10,
   },
   dirLabel: {
     color: colors.dust,
     fontFamily: "Archivo_400Regular",
-    fontSize: 14,
+    fontSize: 13,
   },
   dirName: {
     color: colors.enamel,
@@ -574,32 +617,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
   },
-  result: {
-    marginTop: 28,
+  dock: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(243,234,220,0.14)",
+    backgroundColor: colors.asphalt,
   },
   headline: {
     color: colors.enamel,
-    fontSize: 34,
-    lineHeight: 38,
+    fontSize: 28,
+    lineHeight: 32,
     fontFamily: "Archivo_800ExtraBold",
     letterSpacing: -0.5,
   },
   sub: {
-    marginTop: 8,
+    marginTop: 4,
     color: colors.enamel,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: "Archivo_400Regular",
   },
   why: {
-    marginTop: 8,
+    marginTop: 4,
     color: colors.dust,
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Archivo_400Regular",
   },
   conf: {
-    marginTop: 14,
+    marginTop: 6,
     color: colors.dust,
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Archivo_400Regular",
   },
   err: {
@@ -608,15 +655,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   feedback: {
-    marginTop: 22,
-    paddingTop: 16,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: "rgba(243,234,220,0.14)",
   },
   voteRow: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 10,
+    marginTop: 8,
   },
   vote: {
     borderWidth: 1,
@@ -639,11 +686,5 @@ const styles = StyleSheet.create({
   },
   voteOnText: {
     color: colors.enamel,
-  },
-  foot: {
-    marginTop: 40,
-    color: "rgba(203,187,168,0.8)",
-    fontSize: 13,
-    fontFamily: "Archivo_400Regular",
   },
 });

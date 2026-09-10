@@ -4,7 +4,7 @@ import Svg, { Polygon, Rect, Text as SvgText } from "react-native-svg";
 import { LINES } from "../data.js";
 import { colors } from "../theme.js";
 
-export function Train({ carCount = 6, active = [], any = false, lineId, direction }) {
+export function Train({ carCount = 6, active = [], any = false, lineId, direction, compact = false }) {
   const cars = Array.from({ length: carCount }, (_, i) => i + 1);
   const cabW = 16;
   const gap = 4;
@@ -50,7 +50,7 @@ export function Train({ carCount = 6, active = [], any = false, lineId, directio
           );
         })}
       </Svg>
-      <View style={styles.front}>
+      <View style={[styles.front, compact && styles.frontCompact]}>
         <View style={styles.nose} />
         <Text style={styles.frontText}>frente do trem · sentido {direction ?? "—"}</Text>
       </View>
@@ -64,6 +64,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginBottom: 16,
+  },
+  frontCompact: {
+    marginBottom: 4,
   },
   nose: {
     width: 22,

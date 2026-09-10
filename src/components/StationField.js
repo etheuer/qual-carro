@@ -35,6 +35,8 @@ export function StationField({
           autoCorrect={false}
           autoCapitalize="none"
           accessibilityLabel={label}
+          returnKeyType="search"
+          autoComplete="off"
           style={styles.input}
         />
         {showClear ? (
@@ -81,7 +83,7 @@ export function StationField({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginTop: 16,
+    marginTop: 12,
   },
   label: {
     color: colors.dust,
