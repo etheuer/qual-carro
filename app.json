@@ -16,12 +16,37 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.qualcarro",
-      "appleTeamId": "A955F6A486",
+      "appleTeamId": "4PYU2TX7XN",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
+      },
+      "privacyManifests": {
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeProductInteraction",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          }
+        ],
+        "NSPrivacyTracking": false
       }
     },
     "android": {
@@ -32,7 +57,9 @@
       "package": "app.qualcarro"
     },
     "extra": {
-      "reportsUrl": ""
+      "reportsUrl": "https://qual-carro-reports.sunny-mangosteen.workers.dev",
+      "privacyPolicyUrl": "https://etheuer.github.io/qual-carro/legal/privacidade.html",
+      "supportUrl": "https://etheuer.github.io/qual-carro/legal/suporte.html"
     },
     "plugins": ["expo-dev-client"]
   }
