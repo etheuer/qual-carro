@@ -11,13 +11,14 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
-      "backgroundColor": "#241f1b"
+      "backgroundColor": "#241f1b",
+      "enableFullScreenImage_legacy": true
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.qualcarro",
       "appleTeamId": "4PYU2TX7XN",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "config": {
         "usesNonExemptEncryption": false
       },
