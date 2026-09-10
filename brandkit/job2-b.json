@@ -1,0 +1,24 @@
+[
+  {
+    "created_at": "2026-09-10T19:56:00.88222Z",
+    "display_name": "GPT Image 2.5",
+    "id": "a8b45384-7581-4564-ba69-4f693f2f17d2",
+    "job_type": "gpt_image_2_5",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_195600_a8b45384-7581-4564-ba69-4f693f2f17d2_min.webp",
+    "params": {
+      "aspect_ratio": "1:1",
+      "background": "opaque",
+      "height": 2048,
+      "medias": [],
+      "model": "flare",
+      "prompt": "Premium iOS app icon, square 1:1 full bleed, finished production artwork not a draft. Dark asphalt field #241F1B. Three tall rounded metro-car pillars standing like a selector, enamel finish with soft specular edges. Left pillar is selected: glowing metro red #D01212 with a small upward triangle of cream enamel perched on top like a boarding pin. Middle pillar saturated metro blue #0B5BD3, right pillar cream #F3EADC. Gentle ambient occlusion between the pillars, slight ground contact shadow, tactile 3D-but-graphic toy-enamel look. Must read instantly as “pick this car” at small size. No text, no official transit logos, no photography of a real train, no UI chrome. Centered, isolated, opaque background.",
+      "quality": "max",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 2048
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_195600_a8b45384-7581-4564-ba69-4f693f2f17d2.png",
+    "status": "completed"
+  }
+]

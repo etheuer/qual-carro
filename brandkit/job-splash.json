@@ -1,0 +1,33 @@
+[
+  {
+    "created_at": "2026-09-10T20:01:20.426575Z",
+    "display_name": "GPT Image 2.5",
+    "id": "3cc511b9-814c-4e1b-8725-026f21a6d59f",
+    "job_type": "gpt_image_2_5",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_200120_3cc511b9-814c-4e1b-8725-026f21a6d59f_min.webp",
+    "params": {
+      "aspect_ratio": "9:16",
+      "background": "opaque",
+      "height": 2688,
+      "medias": [
+        {
+          "data": {
+            "id": "b3a97336-0d50-4fd2-ad69-6450e0bdf374",
+            "type": "media_input",
+            "url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/b3a97336-0d50-4fd2-ad69-6450e0bdf374.png"
+          },
+          "role": "image"
+        }
+      ],
+      "model": "flare",
+      "prompt": "Tall iPhone splash screen, 9:16 portrait, full bleed. Use the exact same 3D metro trains from the reference image: cream rear car, glossy red front car selected, cream train beside it, blue rails, dark asphalt #241F1B, same materials and lighting. Center the train group in the middle of the tall frame with generous empty asphalt above and below. No text, no logo wordmark, no status bar, no UI, no people, no station signs. Opaque background. Keep the trains identical to the reference, only the canvas is taller.",
+      "quality": "max",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 1520
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_200120_3cc511b9-814c-4e1b-8725-026f21a6d59f.png",
+    "status": "completed"
+  }
+]

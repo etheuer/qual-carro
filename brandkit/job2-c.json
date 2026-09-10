@@ -1,0 +1,24 @@
+[
+  {
+    "created_at": "2026-09-10T19:56:00.923116Z",
+    "display_name": "GPT Image 2.5",
+    "id": "18f91fc5-e010-4268-acfd-69c8b121b9c7",
+    "job_type": "gpt_image_2_5",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_195600_18f91fc5-e010-4268-acfd-69c8b121b9c7_min.webp",
+    "params": {
+      "aspect_ratio": "1:1",
+      "background": "opaque",
+      "height": 2048,
+      "medias": [],
+      "model": "flare",
+      "prompt": "Premium iOS app icon, square 1:1 full bleed, finished production artwork with craft, not a flat infographic. Dark asphalt #241F1B. A single rounded metro car body in metro red #D01212, like a lacquered enamel object. Three window bays: the left bay is an open dark doorway inviting boarding, the other two windows are lit metro-blue #0B5BD3 glass with a faint inner glow. Cream enamel #F3EADC running board along the bottom. Soft studio lighting, rounded volume, crisp edges, a hint of reflection on the body. Icon-grade, not a scene, not a sketch. No text, no Metrô SP or CPTM identity, no people. Centered, isolated, opaque background.",
+      "quality": "max",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 2048
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_195600_18f91fc5-e010-4268-acfd-69c8b121b9c7.png",
+    "status": "completed"
+  }
+]

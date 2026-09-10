@@ -23,3 +23,7 @@ server/data.json
 .env
 .wrangler/
 
+
+brandkit/state.json
+
+assets/brand/kv/splash-raw.png

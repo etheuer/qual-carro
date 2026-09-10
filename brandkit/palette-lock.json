@@ -1,0 +1,28 @@
+{
+  "source_summary": "Locked from Qualcarro app tokens, not a generated palette pick.",
+  "palette": {
+    "colors": [
+      {
+        "hex": "#241F1B",
+        "name": "Asphalt",
+        "role": "background"
+      },
+      {
+        "hex": "#F3EADC",
+        "name": "Enamel",
+        "role": "text"
+      },
+      {
+        "hex": "#0B5BD3",
+        "name": "Metro blue",
+        "role": "accent"
+      },
+      {
+        "hex": "#D01212",
+        "name": "Metro red",
+        "role": "accent"
+      }
+    ],
+    "gradients": []
+  }
+}

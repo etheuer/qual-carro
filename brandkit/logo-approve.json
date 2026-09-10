@@ -1,0 +1,12 @@
+{
+  "approval_summary": "User selected kv2-a, GPT Image 2.5 job 18b9496b-b7c9-43b3-a89b-840304fbc17e: glossy 3D red-front / cream-rear metro trains.",
+  "logo": {
+    "name": "kv2-a",
+    "asset": {
+      "id": "18b9496b-b7c9-43b3-a89b-840304fbc17e",
+      "path": "/Users/fulanodetal/Developer/qual-carro/assets/brand/kv/kv2-a.png",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_195731_18b9496b-b7c9-43b3-a89b-840304fbc17e.png"
+    },
+    "geometry_fingerprint": "1e9733bceb069cd5a1c9ce592f2dd777a0810e8458ea8d216408dc5588594e1a"
+  }
+}
