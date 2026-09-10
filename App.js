@@ -33,11 +33,14 @@ import {
   stationTitle,
   transferOptions,
 } from "./src/lookup.js";
-import { zoneLabel, zoneToCars } from "./src/cells.js";
+import { shouldAsk, zoneLabel, zoneToCars } from "./src/cells.js";
 import {
   MARKS_KEY,
+  PUBLISHED_KEY,
+  SNAP_KEY,
   lastZone,
   normalizeStore,
+  progressLine,
   publishedFromMarks,
   setMark,
 } from "./src/marks.js";
@@ -70,6 +73,17 @@ export default function App() {
   const [transferTo, setTransferTo] = useState(null);
   const [marks, setMarks] = useState({});
   const [remotePublished, setRemotePublished] = useState({});
+  const [remoteCells, setRemoteCells] = useState({});
+
+  function applySnap(snap) {
+    if (!snap) return;
+    const published = snap.published || {};
+    const cells = snap.cells || {};
+    setRemotePublished(published);
+    setRemoteCells(cells);
+    AsyncStorage.setItem(SNAP_KEY, JSON.stringify({ published, cells }));
+    AsyncStorage.setItem(PUBLISHED_KEY, JSON.stringify(published));
+  }
 
   useEffect(() => {
     AsyncStorage.getItem(MARKS_KEY).then((raw) => {
@@ -78,10 +92,30 @@ export default function App() {
       setMarks(next);
       AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
     });
-    fetchReports().then((snap) => {
-      if (snap?.published) setRemotePublished(snap.published);
+    AsyncStorage.getItem(SNAP_KEY).then((raw) => {
+      if (!raw) {
+        AsyncStorage.getItem(PUBLISHED_KEY).then((old) => {
+          if (old) setRemotePublished(JSON.parse(old));
+        });
+        return;
+      }
+      const snap = JSON.parse(raw);
+      setRemotePublished(snap.published || {});
+      setRemoteCells(snap.cells || {});
     });
+    fetchReports().then(applySnap);
   }, []);
+
+  useEffect(() => {
+    if (!destId) return;
+    let live = true;
+    fetchReports().then((snap) => {
+      if (live) applySnap(snap);
+    });
+    return () => {
+      live = false;
+    };
+  }, [destId]);
 
   useEffect(() => {
     const sub = Keyboard.addListener("keyboardDidHide", () => {
@@ -154,12 +188,11 @@ export default function App() {
   }
 
   async function saveMark(zone) {
-    if (!adv || adv.error || adv.need) return;
+    if (!shouldAsk(adv)) return;
     const next = setMark(marks, adviceKey(adv), zone);
     setMarks(next);
     await AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
-    const snap = await postReport(adviceKey(adv), zone);
-    if (snap?.published) setRemotePublished(snap.published);
+    applySnap(await postReport(adviceKey(adv), zone));
   }
 
   useEffect(() => {
@@ -386,6 +419,11 @@ export default function App() {
                 lineId={lineId}
                 stripe={stripe}
                 myZone={myZone}
+                cell={
+                  adv && !adv.error && !adv.need
+                    ? remoteCells[adviceKey(adv)] || null
+                    : null
+                }
                 saveMark={saveMark}
               />
             ) : null}
@@ -396,7 +434,7 @@ export default function App() {
   );
 }
 
-function ResultBoard({ destId, adv, lineId, stripe, myZone, saveMark }) {
+function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, saveMark }) {
   const rail = <View style={[styles.rail, { backgroundColor: stripe }]} />;
 
   if (!destId) {
@@ -434,14 +472,25 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, saveMark }) {
     );
   }
 
+  const asking = shouldAsk(adv);
   const ask =
-    adv.intent === "transfer" ? "Onde ficou a integração?" : "Onde ficou a escada?";
-  const source =
-    adv.origin === "users"
-      ? "Quem já fez essa viagem neste sentido."
+    adv.origin === "seed"
+      ? adv.intent === "transfer"
+        ? "Confere: onde ficou a integração?"
+        : "Confere: onde ficou a escada?"
+      : adv.intent === "transfer"
+        ? "Onde ficou a integração?"
+        : "Onde ficou a escada?";
+  const progress = progressLine(cell);
+  const source = adv.confident
+    ? adv.origin === "users"
+      ? "Confirmado neste sentido. Não precisamos mais dessa plataforma."
+      : "Nesta plataforma o carro quase não muda."
+    : progress
+      ? progress
       : adv.origin === "seed"
-        ? "Pela geometria da estação, sem visita de campo."
-        : null;
+        ? "Estimativa. Ainda estamos conferindo neste sentido."
+        : "Ainda estamos conferindo neste sentido.";
 
   return (
     <View style={styles.board}>
@@ -469,32 +518,44 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, saveMark }) {
           {adv.why}
         </Text>
       ) : null}
-      {source ? <Text style={styles.conf}>{source}</Text> : null}
-      <Text style={styles.ask}>{ask}</Text>
-      <View style={styles.voteRow}>
-        {["frente", "meio", "fundo"].map((zone) => {
-          const on = myZone === zone;
-          const mapped = zoneToCars(zone, adv.carCount);
-          return (
-            <Pressable
-              key={zone}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={zoneLabel(zone)}
-              onPress={() => saveMark(zone)}
-              style={[styles.zone, on && styles.onLight]}
-            >
-              <Text style={[styles.zoneName, on && styles.onLightText]}>
-                {zone === "frente" ? "Frente" : zone === "meio" ? "Meio" : "Trás"}
-              </Text>
-              <Text style={[styles.zoneCars, on && styles.onLightText]}>
-                {formatCars(mapped.cars, false)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      {myZone ? <Text style={styles.conf}>Você apontou: {zoneLabel(myZone)}.</Text> : null}
+      <Text
+        style={styles.conf}
+        accessibilityLabel={source}
+        testID="board-status"
+      >
+        {source}
+      </Text>
+      {asking ? (
+        <>
+          <Text style={styles.ask}>{ask}</Text>
+          <View style={styles.voteRow}>
+            {["frente", "meio", "fundo"].map((zone) => {
+              const on = myZone === zone;
+              const mapped = zoneToCars(zone, adv.carCount);
+              return (
+                <Pressable
+                  key={zone}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={zoneLabel(zone)}
+                  onPress={() => saveMark(zone)}
+                  style={[styles.zone, on && styles.onLight]}
+                >
+                  <Text style={[styles.zoneName, on && styles.onLightText]}>
+                    {zone === "frente" ? "Frente" : zone === "meio" ? "Meio" : "Trás"}
+                  </Text>
+                  <Text style={[styles.zoneCars, on && styles.onLightText]}>
+                    {formatCars(mapped.cars, false)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {myZone ? (
+            <Text style={styles.conf}>Você apontou: {zoneLabel(myZone)}.</Text>
+          ) : null}
+        </>
+      ) : null}
     </View>
   );
 }

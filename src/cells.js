@@ -186,15 +186,25 @@ export function getAdvice({
   }
 
   const mapped = zoneToCars(zone, carCount);
+  const unknown = zone === "unknown";
+  const confident = origin === "users" || zone === "qualquer";
   return {
     cars: mapped.cars,
     any: mapped.any,
-    unknown: zone === "unknown",
+    unknown,
     zone,
     origin,
     why,
     sourceUrl,
     carCount,
+    confident,
+    asking: !confident,
     confidence: origin === "users" ? "users" : origin === "seed" ? "seed" : "unknown",
   };
+}
+
+/** Ask only while this platform is not settled. */
+export function shouldAsk(adv) {
+  if (!adv || adv.error || adv.need) return false;
+  return Boolean(adv.asking);
 }

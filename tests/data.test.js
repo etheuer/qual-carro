@@ -3,8 +3,16 @@ import { describe, it } from "node:test";
 import { LINE_ORDER, LINES, STATION_NAMES, linesAt, searchStations } from "../src/data.js";
 import { findPath, firstAlighting } from "../src/router.js";
 import { currentAdvice, formatCars } from "../src/lookup.js";
-import { SEED_CELLS, getAdvice, zoneToCars } from "../src/cells.js";
-import { addMark, publishedFromMarks, setMark, lastZone, tally, PUBLISH_MIN } from "../src/marks.js";
+import { SEED_CELLS, getAdvice, shouldAsk, zoneToCars } from "../src/cells.js";
+import {
+  addMark,
+  publishedFromMarks,
+  progressLine,
+  setMark,
+  lastZone,
+  tally,
+  PUBLISH_MIN,
+} from "../src/marks.js";
 import { applyVote, aggregateVotes } from "../src/reports.js";
 
 describe("station graph", () => {
@@ -35,6 +43,8 @@ describe("cells", () => {
     assert.equal(a.zone, "meio");
     assert.deepEqual(a.cars, [3, 4]);
     assert.equal(a.origin, "seed");
+    assert.equal(a.confident, false);
+    assert.equal(shouldAsk(a), true);
   });
 
   it("does not invent ends for an unsurveyed station", () => {
@@ -47,6 +57,8 @@ describe("cells", () => {
   it("does not invent ends for Sé escada", () => {
     const a = getAdvice({ stationId: "se", lineId: "1", intent: "escada", direction: "Tucuruvi" });
     assert.equal(a.unknown, true);
+    assert.equal(shouldAsk(a), true);
+    assert.equal(a.confident, false);
   });
 
   it("marks Paraíso transfer as any car", () => {
@@ -54,6 +66,8 @@ describe("cells", () => {
     assert.equal(a.any, true);
     assert.equal(a.cars.length, 6);
     assert.equal(a.zone, "qualquer");
+    assert.equal(a.confident, true);
+    assert.equal(shouldAsk(a), false);
   });
 
   it("maps thirds onto 6- and 7-car trains", () => {
@@ -114,6 +128,8 @@ describe("marks", () => {
     assert.equal(a.zone, "frente");
     assert.equal(a.origin, "users");
     assert.deepEqual(a.cars, [1, 2]);
+    assert.equal(a.confident, true);
+    assert.equal(shouldAsk(a), false);
   });
 });
 
@@ -141,6 +157,48 @@ describe("shared reports", () => {
     }
     const snap = aggregateVotes(db.votes);
     assert.equal(snap.published["se|1|Tucuruvi|escada"].zone, "fundo");
+    assert.equal(progressLine(snap.cells["se|1|Tucuruvi|escada"]), null);
+  });
+
+  it("does not publish a split even after five votes", () => {
+    let db = { votes: {} };
+    for (let i = 0; i < 3; i++) {
+      db = applyVote(db, {
+        deviceId: `a${i}`,
+        key: "se|1|Jabaquara|escada",
+        zone: "frente",
+      });
+    }
+    for (let i = 0; i < 2; i++) {
+      db = applyVote(db, {
+        deviceId: `b${i}`,
+        key: "se|1|Jabaquara|escada",
+        zone: "meio",
+      });
+    }
+    const snap = aggregateVotes(db.votes);
+    const cell = snap.cells["se|1|Jabaquara|escada"];
+    assert.equal(cell.published, false);
+    assert.equal(snap.published["se|1|Jabaquara|escada"], undefined);
+    assert.equal(progressLine(cell), "Ainda não fechou — 3 frente, 2 meio.");
+  });
+});
+
+describe("progress", () => {
+  it("stays quiet with no votes", () => {
+    assert.equal(progressLine(null), null);
+    assert.equal(progressLine({ n: 0, counts: {}, published: false }), null);
+  });
+
+  it("counts toward the publish bar", () => {
+    assert.equal(
+      progressLine({ n: 1, counts: { frente: 1 }, published: false }),
+      "1 de 5 confirmação neste sentido."
+    );
+    assert.equal(
+      progressLine({ n: 2, counts: { frente: 1, meio: 1 }, published: false }),
+      "2 de 5 confirmações neste sentido."
+    );
   });
 });
 
@@ -232,5 +290,26 @@ describe("lookup", () => {
     });
     assert.equal(adv.routed, true);
     assert.equal(adv.unknown, true);
+    assert.equal(shouldAsk(adv), true);
+  });
+
+  it("stops asking once riders publish a cell", () => {
+    const adv = currentAdvice({
+      destId: "se",
+      lineId: "1",
+      direction: "Tucuruvi",
+      intent: "escada",
+      published: {
+        "se|1|Tucuruvi|escada": {
+          zone: "frente",
+          n: 5,
+          why: "5 de 5 neste sentido apontaram frente",
+        },
+      },
+    });
+    assert.equal(adv.origin, "users");
+    assert.equal(adv.confident, true);
+    assert.equal(shouldAsk(adv), false);
+    assert.deepEqual(adv.cars, [1, 2]);
   });
 });
