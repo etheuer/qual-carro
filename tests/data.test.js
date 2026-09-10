@@ -76,6 +76,17 @@ describe("search", () => {
     const hits = searchStations("se");
     assert.equal(hits[0].id, "se");
   });
+
+  it("does not match mid-word on two letters", () => {
+    const ids = searchStations("se").map((h) => h.id);
+    assert.equal(ids.includes("aacd-servidor"), false);
+    assert.equal(ids.includes("bresser-mooca"), false);
+  });
+
+  it("still finds Itaquera from a later token", () => {
+    const hits = searchStations("itaquera");
+    assert.equal(hits[0].id, "corinthians-itaquera");
+  });
 });
 
 describe("router", () => {

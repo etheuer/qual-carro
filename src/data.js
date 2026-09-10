@@ -712,6 +712,10 @@ export function fold(s) {
     .trim();
 }
 
+function tokens(s) {
+  return s.split(/[\s\-–—/]+/).filter(Boolean);
+}
+
 export function searchStations(query) {
   const q = fold(query);
   if (!q) return allStations();
@@ -720,9 +724,11 @@ export function searchStations(query) {
       const name = fold(st.name);
       const id = fold(st.id);
       let score = 0;
-      if (name.startsWith(q) || id.startsWith(q)) score = 3;
-      else if (name.includes(q) || id.includes(q)) score = 2;
-      else if (q.split(/\s+/).every((p) => name.includes(p))) score = 1;
+      if (name.startsWith(q) || id.startsWith(q)) score = 4;
+      else if (tokens(name).some((t) => t.startsWith(q)) || tokens(id).some((t) => t.startsWith(q))) {
+        score = q.length >= 3 ? 3 : 0;
+      } else if (q.length >= 3 && (name.includes(q) || id.includes(q))) score = 2;
+      else if (q.length >= 3 && q.split(/\s+/).every((p) => name.includes(p))) score = 1;
       return { ...st, score };
     })
     .filter((st) => st.score > 0)
