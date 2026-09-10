@@ -1,1 +1,1 @@
-export const REPORTS_URL = "";
+export const REPORTS_URL = "https://qual-carro-reports.sunny-mangosteen.workers.dev";
