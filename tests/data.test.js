@@ -16,6 +16,8 @@ import {
 import { applyVote, aggregateVotes } from "../src/reports.js";
 import {
   HOME_LEDE,
+  SEND_FAILED,
+  SENDING,
   UNKNOWN_CONTRIBUTE,
   UNKNOWN_HEADLINE,
   afterVoteLine,
@@ -285,10 +287,15 @@ describe("board copy", () => {
     assert.equal(copy.ask, null);
   });
 
-  it("confirms a vote and explains the ask when there is none yet", () => {
+  it("does not claim a vote went in when the send failed", () => {
     const adv = seEscada("escada");
-    assert.equal(voteFootnote(adv, { n: 1 }, "meio").tone, "voted");
-    assert.equal(voteFootnote(adv, null, null).text, UNKNOWN_CONTRIBUTE);
+    assert.deepEqual(voteFootnote(adv, { n: 1 }, "meio", "failed"), {
+      tone: "error",
+      text: SEND_FAILED,
+    });
+    assert.equal(voteFootnote(adv, null, "meio", "sending").text, SENDING);
+    assert.equal(voteFootnote(adv, { n: 1 }, "meio", null).tone, "voted");
+    assert.equal(voteFootnote(adv, null, null, null).text, UNKNOWN_CONTRIBUTE);
   });
 
   it("leads a routed board with where to board", () => {

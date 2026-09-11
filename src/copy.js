@@ -13,6 +13,9 @@ export const UNKNOWN_HEADLINE = "Ainda sem posição";
 export const UNKNOWN_CONTRIBUTE =
   "Fala se ficou na frente, no meio ou atrás. Com 5 neste sentido a gente pinta os carros e para de perguntar.";
 
+export const SENDING = "Enviando…";
+export const SEND_FAILED = "Não deu pra enviar agora. Toca de novo quando tiver sinal.";
+
 export const ZONE_NAME = { frente: "Frente", meio: "Meio", fundo: "Trás" };
 
 function sentence(s) {
@@ -65,8 +68,10 @@ export function sourceLine(adv, cell) {
   return null;
 }
 
-/** The line under Frente/Meio/Trás. */
-export function voteFootnote(adv, cell, myZone) {
+/** The line under Frente/Meio/Trás. send: "sending" | "failed" | null for this cell. */
+export function voteFootnote(adv, cell, myZone, send) {
+  if (send === "sending") return { tone: "info", text: SENDING };
+  if (send === "failed" && myZone) return { tone: "error", text: SEND_FAILED };
   const voted = afterVoteLine(cell, myZone);
   if (voted) return { tone: "voted", text: voted };
   const progress = progressLine(cell);
@@ -75,7 +80,7 @@ export function voteFootnote(adv, cell, myZone) {
 }
 
 /** Everything the result board says, in reading order. */
-export function boardCopy(adv, cell, myZone) {
+export function boardCopy(adv, cell, myZone, send = null) {
   const cars = formatCars(adv.cars, adv.any);
   const asking = Boolean(adv.asking);
   return {
@@ -83,6 +88,6 @@ export function boardCopy(adv, cell, myZone) {
     context: `${adv.routed ? `Embarque em ${stationTitle(adv.boardFromId)}. ` : ""}${intentPhrase(adv)}.`,
     source: sourceLine(adv, cell),
     ask: asking ? askLine(adv) : null,
-    footnote: asking ? voteFootnote(adv, cell, myZone) : null,
+    footnote: asking ? voteFootnote(adv, cell, myZone, send) : null,
   };
 }

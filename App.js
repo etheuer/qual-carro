@@ -38,6 +38,7 @@ import {
   MARKS_KEY,
   PUBLISHED_KEY,
   SNAP_KEY,
+  UNSENT_KEY,
   lastZone,
   normalizeStore,
   publishedFromMarks,
@@ -95,6 +96,9 @@ export default function App() {
   const [marks, setMarks] = useState({});
   const [remotePublished, setRemotePublished] = useState({});
   const [remoteCells, setRemoteCells] = useState({});
+  const [unsent, setUnsent] = useState({});
+  const [sending, setSending] = useState(null);
+  const unsentReady = useRef(false);
 
   const scroller = useRef(null);
   const scrollY = useRef(0);
@@ -129,9 +133,16 @@ export default function App() {
       setRemotePublished(snap.published || {});
       setRemoteCells(snap.cells || {});
     });
+    AsyncStorage.getItem(UNSENT_KEY).then((raw) => {
+      if (raw) setUnsent((prev) => ({ ...JSON.parse(raw), ...prev }));
+      unsentReady.current = true;
+    });
     fetchReports().then(applySnap);
   }, []);
 
+  useEffect(() => {
+    if (unsentReady.current) AsyncStorage.setItem(UNSENT_KEY, JSON.stringify(unsent));
+  }, [unsent]);
 
   useEffect(() => {
     if (!destId) return;
@@ -232,10 +243,21 @@ export default function App() {
 
   async function saveMark(zone) {
     if (!shouldAsk(adv)) return;
-    const next = setMark(marks, adviceKey(adv), zone);
+    const key = adviceKey(adv);
+    const next = setMark(marks, key, zone);
     setMarks(next);
+    setSending(key);
     await AsyncStorage.setItem(MARKS_KEY, JSON.stringify(next));
-    applySnap(await postReport(adviceKey(adv), zone));
+    const snap = await postReport(key, zone);
+    applySnap(snap);
+    setSending((cur) => (cur === key ? null : cur));
+    setUnsent((prev) => {
+      if (Boolean(prev[key]) === !snap) return prev;
+      const out = { ...prev };
+      if (snap) delete out[key];
+      else out[key] = true;
+      return out;
+    });
   }
 
   useEffect(() => {
@@ -460,6 +482,15 @@ export default function App() {
                   myZone={myZone}
                   cell={answered ? remoteCells[answerKey] || null : null}
                   answerKey={answerKey}
+                  send={
+                    !answered
+                      ? null
+                      : sending === answerKey
+                        ? "sending"
+                        : unsent[answerKey]
+                          ? "failed"
+                          : null
+                  }
                   saveMark={saveMark}
                 />
               </View>
@@ -499,16 +530,25 @@ function useSettle(key) {
 }
 
 function Note({ tone, text }) {
-  const icon = tone === "confirmed" || tone === "voted" ? "check" : null;
+  const failed = tone === "error";
+  const icon = failed ? "alert" : tone === "confirmed" || tone === "voted" ? "check" : null;
   return (
     <View style={styles.note} accessibilityLiveRegion="polite">
-      {icon ? <Icon name={icon} size={16} color={colors.ok} /> : null}
-      <Text style={[styles.noteText, tone === "confirmed" && styles.noteStrong]}>{text}</Text>
+      {icon ? <Icon name={icon} size={16} color={failed ? colors.danger : colors.ok} /> : null}
+      <Text
+        style={[
+          styles.noteText,
+          tone === "confirmed" && styles.noteStrong,
+          failed && styles.noteError,
+        ]}
+      >
+        {text}
+      </Text>
     </View>
   );
 }
 
-function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, answerKey, saveMark }) {
+function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, answerKey, send, saveMark }) {
   const settle = useSettle(answerKey ? `${answerKey}|${adv?.zone}` : null);
   const band = <View style={[styles.band, { backgroundColor: stripe }]} />;
 
@@ -539,7 +579,7 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, answerKey, sav
     );
   }
 
-  const copy = boardCopy(adv, cell, myZone);
+  const copy = boardCopy(adv, cell, myZone, send);
 
   return (
     <View style={styles.board}>
@@ -753,6 +793,9 @@ const styles = StyleSheet.create({
   },
   noteStrong: {
     color: colors.enamel,
+  },
+  noteError: {
+    color: colors.danger,
   },
   askBlock: {
     marginTop: 20,
