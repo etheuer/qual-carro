@@ -14,6 +14,12 @@ import {
   PUBLISH_MIN,
 } from "../src/marks.js";
 import { applyVote, aggregateVotes } from "../src/reports.js";
+import {
+  HOME_LEDE,
+  UNKNOWN_CONTRIBUTE,
+  UNKNOWN_HEADLINE,
+  afterVoteLine,
+} from "../src/copy.js";
 
 describe("station graph", () => {
   it("names every id in LINE_ORDER", () => {
@@ -199,6 +205,33 @@ describe("progress", () => {
       progressLine({ n: 2, counts: { frente: 1, meio: 1 }, published: false }),
       "2 de 5 confirmações neste sentido."
     );
+  });
+});
+
+describe("copy", () => {
+  it("states the platform-walk problem on home", () => {
+    assert.match(HOME_LEDE, /anda a plataforma inteira/);
+  });
+
+  it("tells unknown riders that five answers paint the cars", () => {
+    assert.equal(UNKNOWN_HEADLINE, "Ainda sem posição");
+    assert.match(UNKNOWN_CONTRIBUTE, /Com 5 neste sentido/);
+    assert.match(UNKNOWN_CONTRIBUTE, /pinta os carros/);
+  });
+
+  it("counts remaining answers after a vote", () => {
+    assert.equal(
+      afterVoteLine({ n: 1, published: false }, "meio"),
+      "Já entrou. Faltam 4 neste sentido pra pintar."
+    );
+    assert.equal(
+      afterVoteLine({ n: 4, published: false }, "frente"),
+      "Já entrou. Falta 1 neste sentido pra pintar."
+    );
+    assert.equal(afterVoteLine({ n: 5, published: true }, "meio"), null);
+    assert.match(afterVoteLine({ n: 5, published: false }, "meio"), /fechar neste sentido/);
+    assert.match(afterVoteLine(null, "meio"), /Com 5 neste sentido/);
+    assert.equal(afterVoteLine({ n: 1 }, null), null);
   });
 });
 

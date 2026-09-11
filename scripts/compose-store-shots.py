@@ -172,14 +172,18 @@ def compose_splash():
     top = (resized.height - target_h) // 2
     canvas = resized.crop((left, top, left + target_w, top + target_h))
     draw = ImageDraw.Draw(canvas)
-    title_f = font(BOLD, 86)
-    sub_f = font(REG, 36)
+    title_f = font(BOLD, 82)
+    promise_f = font(BOLD, 36)
+    next_f = font(REG, 32)
     title = "Qual carro?"
-    sub = "Entra no carro certo."
+    promise = "Pra não andar a plataforma inteira."
+    nxt = "Fala onde desce. A gente mostra o carro."
     tw = draw.textbbox((0, 0), title, font=title_f)[2]
-    sw = draw.textbbox((0, 0), sub, font=sub_f)[2]
-    draw.text(((target_w - tw) / 2, 280), title, font=title_f, fill=ENAMEL)
-    draw.text(((target_w - sw) / 2, 390), sub, font=sub_f, fill=MUTED)
+    pw = draw.textbbox((0, 0), promise, font=promise_f)[2]
+    nw = draw.textbbox((0, 0), nxt, font=next_f)[2]
+    draw.text(((target_w - tw) / 2, 220), title, font=title_f, fill=ENAMEL)
+    draw.text(((target_w - pw) / 2, 330), promise, font=promise_f, fill=ENAMEL)
+    draw.text(((target_w - nw) / 2, 386), nxt, font=next_f, fill=MUTED)
     dest = ROOT / "assets/splash.png"
     canvas.save(dest, "PNG", optimize=True)
     print("wrote", dest, canvas.size, canvas.mode)
@@ -218,4 +222,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if sys.argv[1:] == ["splash"]:
+        compose_splash()
+    else:
+        main()
