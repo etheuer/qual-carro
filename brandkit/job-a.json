@@ -1,0 +1,26 @@
+[
+  {
+    "created_at": "2026-09-10T19:49:27.423999Z",
+    "display_name": "Recraft V4.1",
+    "id": "1a391b9f-0e6c-4c66-88e6-2454dd45a7d2",
+    "job_type": "recraft_v4_1",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_194927_1a391b9f-0e6c-4c66-88e6-2454dd45a7d2_min.webp",
+    "params": {
+      "aspect_ratio": "1:1",
+      "background_color": "#241F1B",
+      "batch_size": 1,
+      "colors": [
+        "#D01212",
+        "#0B5BD3",
+        "#F3EADC"
+      ],
+      "height": 1024,
+      "model_type": "vector",
+      "prompt": "pictorial mark of a three-car metro train in side view as three equal rounded rectangles sharing one baseline, only the middle car a solid fill in the locked accent while the two outer cars are empty strokes of the locked primary tone, reading as a selected boarding car among neighbors. Construction: three identical rounded rectangles with equal gaps, shared bottom rail as a thin locked-primary bar, middle rectangle fully filled, outer rectangles  stroke-only with generous inner negative space. Distinctive element: hollow-versus-solid car contrast that still reads at small size. Style: São Paulo metro enamel signage geometry, restrained, geometric, flat_vector. Palette behavior: locked accent fills the selected car, locked primary draws the empty cars and rail, locked background is the field. Composition: centered isolated symbol, no scene, large silhouette, few internal details. Flat vector design, clean lines, no shadows, no texture, no text. Clean editable vector paths, SVG-friendly, minimal anchor points.",
+      "resolution": "2k",
+      "width": 1024
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_194927_1a391b9f-0e6c-4c66-88e6-2454dd45a7d2.svg",
+    "status": "completed"
+  }
+]

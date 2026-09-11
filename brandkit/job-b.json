@@ -1,0 +1,26 @@
+[
+  {
+    "created_at": "2026-09-10T19:49:26.891863Z",
+    "display_name": "Recraft V4.1",
+    "id": "faefb18d-2dcd-4eb3-a7d0-40673703248b",
+    "job_type": "recraft_v4_1",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_194926_faefb18d-2dcd-4eb3-a7d0-40673703248b_min.webp",
+    "params": {
+      "aspect_ratio": "1:1",
+      "background_color": "#241F1B",
+      "batch_size": 1,
+      "colors": [
+        "#D01212",
+        "#0B5BD3",
+        "#F3EADC"
+      ],
+      "height": 1024,
+      "model_type": "vector",
+      "prompt": "abstract mark of three equal vertical rounded bars with a small triangular pointer seated on the leftmost bar only, reading as a boarding-position selector. Construction: three stadium-shaped vertical bars of identical height and width with even gutters, pointer is an equilateral triangle centered on the top of the first bar, no other ornaments. Distinctive element: a single top pointer that tags one bar and leaves the other two unmarked. Style: platform-indicator geometry, restrained, geometric, flat_vector. Palette behavior: locked accent fills the pointed bar and the triangle, locked primary fills the two unmarked bars, locked background is the field. Composition: centered isolated symbol, no scene, large silhouette, few internal details. Flat vector design, clean lines, no shadows, no texture, no text. Clean editable vector paths, SVG-friendly, minimal anchor points.",
+      "resolution": "2k",
+      "width": 1024
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3EaTy9BGnzaqbU4yAaev7gfA2VO/hf_20260910_194926_faefb18d-2dcd-4eb3-a7d0-40673703248b.svg",
+    "status": "completed"
+  }
+]

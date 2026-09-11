@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -48,8 +49,20 @@ import { fetchReports, postReport } from "./src/sync.js";
 import { Train } from "./src/components/Train.js";
 import { StationField } from "./src/components/StationField.js";
 import { colors } from "./src/theme.js";
+import {
+  HOME_BOARD,
+  HOME_LEDE,
+  HOME_NEXT,
+  SEED_CONFERE,
+  UNKNOWN_CONTRIBUTE,
+  UNKNOWN_HEADLINE,
+  afterVoteLine,
+} from "./src/copy.js";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Native splash used to vanish as soon as fonts loaded. Hold the same image so the line is readable. */
+const SPLASH_HOLD_MS = 2500;
 
 export default function App() {
   const insets = useSafeAreaInsets();
@@ -60,6 +73,7 @@ export default function App() {
     Archivo_700Bold,
     Archivo_800ExtraBold,
   });
+  const [splashDone, setSplashDone] = useState(false);
 
   const [destId, setDestId] = useState(null);
   const [originId, setOriginId] = useState(null);
@@ -196,11 +210,27 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
+    if (!fontsLoaded) return;
+    const t = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+      setSplashDone(true);
+    }, SPLASH_HOLD_MS);
+    return () => clearTimeout(t);
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return <View style={styles.root} />;
+  if (!fontsLoaded || !splashDone) {
+    return (
+      <View style={styles.root} accessibilityLabel="Qual carro? Pra não andar a plataforma inteira.">
+        {fontsLoaded ? (
+          <Image
+            source={require("./assets/splash.png")}
+            style={styles.launchImg}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
+      </View>
+    );
   }
 
   const myZone =
@@ -228,9 +258,10 @@ export default function App() {
           >
             <Text style={[styles.title, destId && styles.titleOn]}>Qual carro?</Text>
             {!destId ? (
-              <Text style={styles.lede}>
-                Metrô de São Paulo. Entra no carro certo pra não atravessar a plataforma inteira.
-              </Text>
+              <View style={styles.ledeBlock}>
+                <Text style={styles.lede}>{HOME_LEDE}</Text>
+                <Text style={styles.ledeNext}>{HOME_NEXT}</Text>
+              </View>
             ) : null}
 
             <StationField
@@ -442,9 +473,7 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, saveMark }) {
       <View style={styles.board}>
         {rail}
         <Train carCount={6} active={[]} any={false} direction={null} compact />
-        <Text style={styles.sub}>
-          Diz onde você desce. Os carros pintados são onde entrar.
-        </Text>
+        <Text style={styles.sub}>{HOME_BOARD}</Text>
       </View>
     );
   }
@@ -482,15 +511,20 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, saveMark }) {
         ? "Onde ficou a integração?"
         : "Onde ficou a escada?";
   const progress = progressLine(cell);
+  const voted = afterVoteLine(cell, myZone);
   const source = adv.confident
     ? adv.origin === "users"
       ? "Confirmado neste sentido. Não precisamos mais dessa plataforma."
       : "Nesta plataforma o carro quase não muda."
-    : progress
-      ? progress
-      : adv.origin === "seed"
-        ? "Estimativa. Ainda estamos conferindo neste sentido."
-        : "Ainda estamos conferindo neste sentido.";
+    : voted
+      ? voted
+      : adv.unknown
+        ? UNKNOWN_CONTRIBUTE
+        : progress
+          ? progress
+          : adv.origin === "seed"
+            ? SEED_CONFERE
+            : UNKNOWN_CONTRIBUTE;
 
   return (
     <View style={styles.board}>
@@ -507,7 +541,7 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, saveMark }) {
         style={[styles.headline, adv.unknown && styles.headlineUnknown]}
         accessibilityLiveRegion="polite"
       >
-        {adv.unknown ? "Sem posição ainda" : formatCars(adv.cars, adv.any)}
+        {adv.unknown ? UNKNOWN_HEADLINE : formatCars(adv.cars, adv.any)}
       </Text>
       <Text style={styles.sub}>
         {adv.routed ? `Embarque em ${stationTitle(adv.boardFromId)}. ` : ""}
@@ -551,7 +585,7 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, saveMark }) {
               );
             })}
           </View>
-          {myZone ? (
+          {myZone && !voted ? (
             <Text style={styles.conf}>Você apontou: {zoneLabel(myZone)}.</Text>
           ) : null}
         </>
@@ -573,6 +607,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.asphalt,
+  },
+  launchImg: {
+    width: "100%",
+    height: "100%",
   },
   flex: {
     flex: 1,
@@ -608,13 +646,22 @@ const styles = StyleSheet.create({
     fontSize: 26,
     lineHeight: 28,
   },
+  ledeBlock: {
+    marginTop: 12,
+    marginBottom: 4,
+    gap: 8,
+  },
   lede: {
-    marginTop: 10,
+    color: colors.enamel,
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: "Archivo_400Regular",
+  },
+  ledeNext: {
     color: colors.dust,
     fontSize: 16,
     lineHeight: 22,
     fontFamily: "Archivo_400Regular",
-    maxWidth: 280,
   },
   block: {
     marginTop: 16,

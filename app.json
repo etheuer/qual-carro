@@ -9,15 +9,16 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#241f1b"
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#241f1b",
+      "enableFullScreenImage_legacy": true
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.qualcarro",
       "appleTeamId": "4PYU2TX7XN",
-      "buildNumber": "1",
+      "buildNumber": "4",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -61,6 +62,8 @@
       "privacyPolicyUrl": "https://etheuer.github.io/qual-carro/legal/privacidade.html",
       "supportUrl": "https://etheuer.github.io/qual-carro/legal/suporte.html"
     },
-    "plugins": ["expo-dev-client"]
+    "plugins": [
+      "expo-dev-client"
+    ]
   }
 }

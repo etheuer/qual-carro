@@ -1,0 +1,20 @@
+{
+  "source_summary": "Locked from the Qualcarro app: Archivo 700 display, Archivo 400 body.",
+  "typography": {
+    "display": {
+      "family": "Archivo",
+      "source": "google:Archivo",
+      "style": "normal",
+      "weight": 700
+    },
+    "body": {
+      "family": "Archivo",
+      "source": "google:Archivo",
+      "style": "normal",
+      "weight": 400
+    },
+    "font_links": [
+      "https://fonts.google.com/specimen/Archivo"
+    ]
+  }
+}
