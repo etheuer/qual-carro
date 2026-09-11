@@ -16,9 +16,15 @@ import {
 import { applyVote, aggregateVotes } from "../src/reports.js";
 import {
   HOME_LEDE,
+  SEND_FAILED,
+  SENDING,
   UNKNOWN_CONTRIBUTE,
   UNKNOWN_HEADLINE,
   afterVoteLine,
+  askLine,
+  boardCopy,
+  sourceLine,
+  voteFootnote,
 } from "../src/copy.js";
 
 describe("station graph", () => {
@@ -232,6 +238,71 @@ describe("copy", () => {
     assert.match(afterVoteLine({ n: 5, published: false }, "meio"), /fechar neste sentido/);
     assert.match(afterVoteLine(null, "meio"), /Com 5 neste sentido/);
     assert.equal(afterVoteLine({ n: 1 }, null), null);
+  });
+});
+
+describe("board copy", () => {
+  const seEscada = (intent, extra = {}) =>
+    currentAdvice({ destId: "se", lineId: "1", direction: "Tucuruvi", intent, ...extra });
+
+  it("asks about the place the rider was heading to", () => {
+    assert.equal(askLine(seEscada("escada")), "Onde ficou a escada?");
+    assert.equal(askLine(seEscada("saida")), "Onde ficou a saída?");
+    assert.equal(
+      askLine(seEscada("transfer", { transferTo: "3" })),
+      "Confere: onde ficou a integração?"
+    );
+  });
+
+  it("states a seed as an estimate and a settled platform as confirmed", () => {
+    const seed = sourceLine(seEscada("transfer", { transferTo: "3" }), null);
+    assert.equal(seed.tone, "estimate");
+    assert.match(seed.text, /^Estimativa: /);
+
+    const users = currentAdvice({
+      destId: "se",
+      lineId: "1",
+      direction: "Tucuruvi",
+      intent: "escada",
+      published: { "se|1|Tucuruvi|escada": { zone: "meio", n: 5 } },
+    });
+    assert.deepEqual(sourceLine(users, { n: 5, counts: { meio: 5 } }), {
+      tone: "confirmed",
+      text: "Confirmado: 5 de 5 marcaram Meio neste sentido.",
+    });
+  });
+
+  it("explains an any-car platform with its reason, not a vote", () => {
+    const adv = currentAdvice({
+      destId: "paraiso",
+      lineId: "1",
+      direction: "Tucuruvi",
+      intent: "transfer",
+      transferTo: "2",
+    });
+    const copy = boardCopy(adv, null, null);
+    assert.equal(copy.headline, "Qualquer carro");
+    assert.equal(copy.source.tone, "info");
+    assert.match(copy.source.text, /^Integração paralela/);
+    assert.equal(copy.ask, null);
+  });
+
+  it("does not claim a vote went in when the send failed", () => {
+    const adv = seEscada("escada");
+    assert.deepEqual(voteFootnote(adv, { n: 1 }, "meio", "failed"), {
+      tone: "error",
+      text: SEND_FAILED,
+    });
+    assert.equal(voteFootnote(adv, null, "meio", "sending").text, SENDING);
+    assert.equal(voteFootnote(adv, { n: 1 }, "meio", null).tone, "voted");
+    assert.equal(voteFootnote(adv, null, null, null).text, UNKNOWN_CONTRIBUTE);
+  });
+
+  it("leads a routed board with where to board", () => {
+    const adv = currentAdvice({ destId: "corinthians-itaquera", originId: "jabaquara" });
+    const copy = boardCopy(adv, null, null);
+    assert.equal(copy.headline, "Carros 3 e 4");
+    assert.match(copy.context, /^Embarque em Jabaquara\. Na Sé, pra integração com a 3-Vermelha\.$/);
   });
 });
 

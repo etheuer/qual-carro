@@ -1,6 +1,8 @@
 export const MARKS_KEY = "qual-carro-marks";
 export const PUBLISHED_KEY = "qual-carro-published";
 export const SNAP_KEY = "qual-carro-snap";
+/** Cells whose last answer never reached the shared store, so the board can say so. */
+export const UNSENT_KEY = "qual-carro-unsent";
 export const PUBLISH_MIN = 5;
 export const PUBLISH_RATIO = 0.7;
 
