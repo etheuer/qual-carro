@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -60,6 +61,9 @@ import {
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+/** Native splash used to vanish as soon as fonts loaded. Hold the same image so the line is readable. */
+const SPLASH_HOLD_MS = 2500;
+
 export default function App() {
   const insets = useSafeAreaInsets();
   const [fontsLoaded] = useFonts({
@@ -69,6 +73,7 @@ export default function App() {
     Archivo_700Bold,
     Archivo_800ExtraBold,
   });
+  const [splashDone, setSplashDone] = useState(false);
 
   const [destId, setDestId] = useState(null);
   const [originId, setOriginId] = useState(null);
@@ -205,11 +210,27 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
+    if (!fontsLoaded) return;
+    const t = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+      setSplashDone(true);
+    }, SPLASH_HOLD_MS);
+    return () => clearTimeout(t);
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return <View style={styles.root} />;
+  if (!fontsLoaded || !splashDone) {
+    return (
+      <View style={styles.root} accessibilityLabel="Qual carro? Pra não andar a plataforma inteira.">
+        {fontsLoaded ? (
+          <Image
+            source={require("./assets/splash.png")}
+            style={styles.launchImg}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
+      </View>
+    );
   }
 
   const myZone =
@@ -586,6 +607,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.asphalt,
+  },
+  launchImg: {
+    width: "100%",
+    height: "100%",
   },
   flex: {
     flex: 1,
