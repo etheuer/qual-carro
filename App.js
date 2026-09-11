@@ -502,14 +502,9 @@ function ResultBoard({ destId, adv, lineId, stripe, myZone, cell, saveMark }) {
   }
 
   const asking = shouldAsk(adv);
-  const ask =
-    adv.origin === "seed"
-      ? adv.intent === "transfer"
-        ? "Confere: onde ficou a integração?"
-        : "Confere: onde ficou a escada?"
-      : adv.intent === "transfer"
-        ? "Onde ficou a integração?"
-        : "Onde ficou a escada?";
+  const place =
+    adv.intent === "transfer" ? "a integração" : adv.intent === "saida" ? "a saída" : "a escada";
+  const ask = adv.origin === "seed" ? `Confere: onde ficou ${place}?` : `Onde ficou ${place}?`;
   const progress = progressLine(cell);
   const voted = afterVoteLine(cell, myZone);
   const source = adv.confident
