@@ -2,14 +2,6 @@ import { COMMUTER_AT, LINES, LINE_ORDER, STATION_NAMES, linesAt } from "./data.j
 import { findPath, firstAlighting } from "./router.js";
 import { cellKey, getAdvice } from "./cells.js";
 
-export function lineColor(id) {
-  return LINES[id]?.color ?? "#888";
-}
-
-export function lineInk(id) {
-  return LINES[id]?.ink ?? "#fff";
-}
-
 export function stationTitle(id) {
   return STATION_NAMES[id] ?? id;
 }

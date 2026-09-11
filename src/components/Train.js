@@ -1,55 +1,63 @@
 import { Fragment } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Svg, { Polygon, Rect, Text as SvgText } from "react-native-svg";
+import Svg, { Path, Rect, Text as SvgText } from "react-native-svg";
 import { LINES } from "../data.js";
-import { colors } from "../theme.js";
+import { formatCars } from "../lookup.js";
+import { Icon } from "./Icon.js";
+import { colors, font } from "../theme.js";
 
-export function Train({
-  carCount = 6,
-  active = [],
-  any = false,
-  lineId,
-  direction,
-  compact = false,
-}) {
+const W = 360;
+const H = 72;
+const PAD = 2;
+const CAB = 18;
+const GAP = 4;
+
+function describe(carCount, active, any) {
+  if (any) return `Trem de ${carCount} carros. Qualquer carro serve.`;
+  if (active.length) {
+    const cars = formatCars(active, false);
+    return `Trem de ${carCount} carros. Entre ${cars.startsWith("carros") ? "nos" : "no"} ${cars}.`;
+  }
+  return `Trem de ${carCount} carros. Carro 1 é a frente.`;
+}
+
+export function Train({ carCount = 6, active = [], any = false, lineId, direction }) {
   const cars = Array.from({ length: carCount }, (_, i) => i + 1);
-  const cabW = 16;
-  const gap = 4;
-  const pad = 8;
-  const inner = 360 - pad * 2;
-  const carW = (inner - cabW - gap * carCount) / carCount;
-  const h = 72;
+  const carW = (W - PAD * 2 - CAB - GAP * carCount) / carCount;
   const line = lineId && LINES[lineId];
   const onFill = line?.color ?? colors.idleLine;
   const onInk = line?.ink ?? colors.enamel;
+  const nose = PAD + CAB;
+  const top = 6;
+  const bottom = H - 6;
 
   return (
-    <View>
-      <Svg viewBox={`0 0 360 ${h}`} width="100%" height={72} accessibilityLabel={`Trem de ${carCount} carros`}>
-        <Polygon
-          points={`${pad},20 ${pad + cabW},8 ${pad + cabW},${h - 8} ${pad},52`}
+    <View accessible accessibilityLabel={describe(carCount, active, any)}>
+      <Svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+        <Path
+          d={`M${nose} ${top} L${nose} ${bottom} L${PAD + 7} ${bottom - 6} Q${PAD} ${bottom - 9} ${PAD} ${bottom - 17} L${PAD} ${top + 17} Q${PAD} ${top + 9} ${PAD + 7} ${top + 6} Z`}
           fill={colors.enamel}
         />
         {cars.map((n, i) => {
-          const x = pad + cabW + gap + i * (carW + gap);
+          const x = nose + GAP + i * (carW + GAP);
           const on = any || active.includes(n);
           return (
             <Fragment key={n}>
               <Rect
                 x={x}
-                y={8}
+                y={top}
                 width={carW}
-                height={h - 16}
+                height={bottom - top}
+                rx={5}
                 fill={on ? onFill : colors.carOff}
               />
               <SvgText
                 x={x + carW / 2}
-                y={52}
+                y={H / 2 + 8}
                 textAnchor="middle"
                 fill={on ? onInk : colors.carOffInk}
                 fontSize="22"
-                fontWeight="700"
-                fontFamily="Archivo"
+                fontFamily={font.bold}
               >
                 {String(n)}
               </SvgText>
@@ -57,12 +65,10 @@ export function Train({
           );
         })}
       </Svg>
-      <View style={[styles.front, compact && styles.frontCompact]}>
-        <View style={styles.nose} />
+      <View style={styles.front} importantForAccessibility="no-hide-descendants">
+        <Icon name="arrowLeft" size={16} color={colors.dust} />
         <Text style={styles.frontText}>
-          {direction
-            ? `sentido ${direction} — carro 1 é a frente`
-            : "cada número é um carro — carro 1 é a frente"}
+          {direction ? `Carro 1 é a frente · sentido ${direction}` : "Carro 1 é a frente do trem"}
         </Text>
       </View>
     </View>
@@ -73,20 +79,14 @@ const styles = StyleSheet.create({
   front: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  frontCompact: {
-    marginBottom: 4,
-  },
-  nose: {
-    width: 22,
-    height: 3,
-    backgroundColor: colors.dust,
+    gap: 6,
+    marginTop: 8,
   },
   frontText: {
+    flexShrink: 1,
     color: colors.dust,
-    fontSize: 14,
-    fontFamily: "Archivo",
+    fontFamily: font.regular,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

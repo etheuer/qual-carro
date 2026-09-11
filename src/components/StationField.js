@@ -1,80 +1,112 @@
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { LINES } from "../data.js";
-import { COMMUTER_AT, LINE_ORDER, lineColor, lineInk } from "../lookup.js";
-import { searchStations } from "../data.js";
-import { colors } from "../theme.js";
+import { LINES, searchStations } from "../data.js";
+import { COMMUTER_AT, LINE_ORDER } from "../lookup.js";
+import { Icon } from "./Icon.js";
+import { LineBullet } from "./LineBullet.js";
+import { colors, font, radius } from "../theme.js";
+
+function stationLines(st) {
+  return st.lines
+    .filter((lid) => LINE_ORDER[lid] || (COMMUTER_AT[st.id] || []).includes(lid))
+    .slice(0, 4);
+}
 
 export function StationField({
   label,
   placeholder,
+  optional = false,
   query,
   onChangeQuery,
   onPick,
   onFocus,
+  onClear,
+  focusOnClear = false,
   open,
   excludeId,
-  showClear,
-  onClear,
 }) {
-  let hits =
-    open && query.trim()
-      ? searchStations(query).slice(0, 8)
-      : [];
+  const input = useRef(null);
+  const [focused, setFocused] = useState(false);
+  const typed = query.trim();
+  let hits = open && typed ? searchStations(query).slice(0, 8) : [];
   if (excludeId) hits = hits.filter((s) => s.id !== excludeId);
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.row}>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>{label}</Text>
+        {optional ? <Text style={styles.optional}>opcional</Text> : null}
+      </View>
+      <View style={[styles.field, focused && styles.fieldFocused]}>
         <TextInput
+          ref={input}
           value={query}
           onChangeText={onChangeQuery}
-          onFocus={onFocus}
+          onFocus={() => {
+            setFocused(true);
+            onFocus?.();
+          }}
+          onBlur={() => setFocused(false)}
+          onSubmitEditing={() => {
+            if (hits[0]) onPick(hits[0].id);
+          }}
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
+          selectionColor={colors.enamel}
           autoCorrect={false}
           autoCapitalize="none"
-          accessibilityLabel={label}
-          returnKeyType="search"
           autoComplete="off"
+          returnKeyType="search"
+          accessibilityLabel={optional ? `${label}, opcional` : label}
           style={styles.input}
         />
-        {showClear ? (
-          <Pressable onPress={onClear} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.clear}>limpar</Text>
+        {query ? (
+          <Pressable
+            onPress={() => {
+              onClear();
+              if (focusOnClear) input.current?.focus();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Limpar ${label.toLowerCase()}`}
+            style={styles.clear}
+          >
+            <Icon name="clear" size={20} color={colors.idleLine} />
           </Pressable>
         ) : null}
       </View>
-      {open && hits.length > 0 ? (
+      {open && typed ? (
         <View style={styles.list}>
-          {hits.map((st) => {
-            const chips = st.lines
-              .filter((lid) => LINE_ORDER[lid] || (COMMUTER_AT[st.id] || []).includes(lid))
-              .slice(0, 4);
-            return (
-              <Pressable
-                key={st.id}
-                onPress={() => onPick(st.id)}
-                style={styles.suggest}
-                accessibilityRole="button"
-                accessibilityLabel={st.name}
-              >
-                <Text style={styles.suggestName}>{st.name}</Text>
-                <View style={styles.chips}>
-                  {chips.map((lid) => (
-                    <View
-                      key={lid}
-                      style={[styles.chip, { backgroundColor: lineColor(lid) }]}
-                    >
-                      <Text style={[styles.chipText, { color: lineInk(lid) }]}>
-                        {LINES[lid].short}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </Pressable>
-            );
-          })}
+          {hits.length ? (
+            hits.map((st, i) => {
+              const lines = stationLines(st);
+              return (
+                <Pressable
+                  key={st.id}
+                  onPress={() => onPick(st.id)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && styles.rowRule,
+                    pressed && styles.rowPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${st.name}, ${lines
+                    .map((lid) => `linha ${LINES[lid].name}`)
+                    .join(", ")}`}
+                >
+                  <Text style={styles.rowName}>{st.name}</Text>
+                  <View style={styles.bullets}>
+                    {lines.map((lid) => (
+                      <LineBullet key={lid} lineId={lid} size={22} />
+                    ))}
+                  </View>
+                </Pressable>
+              );
+            })
+          ) : (
+            <Text style={styles.empty}>
+              Nenhuma estação do metrô com “{typed}”.
+            </Text>
+          )}
         </View>
       ) : null}
     </View>
@@ -83,67 +115,91 @@ export function StationField({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginTop: 12,
+    gap: 8,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
   },
   label: {
     color: colors.dust,
-    fontSize: 15,
-    fontFamily: "Archivo",
-    marginBottom: 6,
+    fontFamily: font.semibold,
+    fontSize: 14,
+    lineHeight: 18,
   },
-  row: {
+  optional: {
+    color: colors.muted,
+    fontFamily: font.regular,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  field: {
+    minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "rgba(243,234,220,0.28)",
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.asphalt2,
+  },
+  fieldFocused: {
+    borderColor: colors.focus,
   },
   input: {
     flex: 1,
+    alignSelf: "stretch",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     color: colors.enamel,
+    fontFamily: font.semibold,
     fontSize: 20,
-    fontFamily: "Archivo_600SemiBold",
-    paddingVertical: 8,
-    paddingRight: 8,
   },
   clear: {
-    color: colors.dust,
-    fontSize: 14,
-    fontFamily: "Archivo",
-    padding: 6,
-  },
-  list: {
-    backgroundColor: colors.asphalt2,
-    borderWidth: 1,
-    borderColor: "rgba(243,234,220,0.12)",
-    marginTop: 4,
-  },
-  suggest: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-  },
-  suggestName: {
-    color: colors.enamel,
-    fontSize: 16,
-    fontFamily: "Archivo",
-    flex: 1,
-  },
-  chips: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  chip: {
-    minWidth: 22,
-    height: 22,
-    paddingHorizontal: 5,
+    width: 48,
+    alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
   },
-  chipText: {
-    fontSize: 11,
-    fontFamily: "Archivo_700Bold",
+  list: {
+    overflow: "hidden",
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.asphalt2,
+  },
+  row: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  rowRule: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  rowPressed: {
+    backgroundColor: colors.asphalt3,
+  },
+  rowName: {
+    flex: 1,
+    color: colors.enamel,
+    fontFamily: font.regular,
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  bullets: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  empty: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    color: colors.dust,
+    fontFamily: font.regular,
+    fontSize: 15,
+    lineHeight: 20,
   },
 });
